@@ -13,7 +13,7 @@ def retr_files(ftp, temp_store):
             ftp.retrbinary("RETR " + n, open(temp_store + fname, 'wb').write)
         except:
             f = open(log_directory + 'retrieval_log.txt', "a+")
-            f.write(file_valid_list + ' failure at ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S')+'\n')
+            f.write(n + ' failure at ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S')+'\n')
             f.close()
             break
     f = open(log_directory + 'retrieval_log.txt', "a+")

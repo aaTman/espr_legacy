@@ -1,2 +1,5 @@
 /temp
 /logs
+/reforecast
+*.pyc
+*nohup.out
