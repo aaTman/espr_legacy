@@ -2,11 +2,12 @@ from ftplib import FTP
 from time import sleep
 from retr import retr_files
 from datetime import datetime
+import paths as ps
 import sys
 
 def monitor(server, directory, temp_store):
-    log_directory = '/home/taylorm/espr/logs/'
-    with open(log_directory + 'current_run.txt', "a+") as f:
+    log_directory = ps.log_directory
+    with open(log_directory + 'current_run.txt', "r") as f:
         try:
             old_date, old_run, _ = f.readlines()[-1].split('_')
         except IndexError:
@@ -30,12 +31,12 @@ def monitor(server, directory, temp_store):
             retr_files(ftp,temp_store)
             old_date = new_date
             old_run = new_run
-            with open(log_directory + 'current_run.txt', "a+") as f:
+            with open(log_directory + 'current_run.txt', "a") as f:
                 f.write(new_date+'_'+new_run+'_\n')
-            print('completed at' + datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            print('completed at ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             ftp.quit()
     else:
         ftp.quit()
 
-monitor('ftp.ncep.noaa.gov', '/pub/data/nccf/com/gens/prod', '/home/taylorm/espr/temp/')
+monitor(ps.ftp, ps.ftp_dir, ps.data_store)
     

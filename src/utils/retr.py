@@ -1,9 +1,10 @@
 from ftplib import FTP 
 import numpy as np
 from datetime import datetime
+import paths as ps 
 
 def retr_files(ftp, temp_store):
-    log_directory = '/home/taylorm/espr/logs/'
+    log_directory = ps.log_directory
     file_list = ftp.nlst()
     file_valid_list = [n for n in file_list if np.logical_and('geavg' in n, '.idx' not in n)]
     file_valid_list = [n for n in file_valid_list if np.logical_and(int(n[-3:]) <= 168, int(n[-3:]) % 6 == 0)]
@@ -12,12 +13,11 @@ def retr_files(ftp, temp_store):
         try:
             ftp.retrbinary("RETR " + n, open(temp_store + fname, 'wb').write)
         except:
-            f = open(log_directory + 'retrieval_log.txt', "a+")
-            f.write(n + ' failure at ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S')+'\n')
-            f.close()
+            with open(log_directory + 'retrieval_log.txt', "a") as f:
+                f.write(n + ' failure at ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S')+'\n')
             break
-    f = open(log_directory + 'retrieval_log.txt', "a+")
-    f.write('completed at ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S')+'\n')
-    f.close()
+    with open(log_directory + 'retrieval_log.txt', "a") as f:
+        f.write('completed at ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S')+'\n')
+
 
          
