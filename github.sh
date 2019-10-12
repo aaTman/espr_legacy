@@ -1,2 +1,2 @@
-unset SSH_ASKPAss
+unset SSH_ASKPASS
 git push origin master
