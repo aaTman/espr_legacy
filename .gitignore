@@ -2,5 +2,6 @@
 /logs
 /reforecast
 *.pyc
-/src/*.ipynb
+i
+/src/*.ipynb*
 *nohup.out

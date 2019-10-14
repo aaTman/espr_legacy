@@ -96,7 +96,7 @@ class MClimate(object):
         file = file.assign_coords(time=ut.replace_year(file.time.values, 2012))
         file = file.assign_coords({'time':file.time.values.astype('datetime64[h]')})
         file = self._subset_time(file)   
-        file = file.drop(['intTime','intValidTime'])
+        file = file.drop(['intTime', 'intValidTime', 'fhour'])
         if self.variable == 'wnd':
             file = xu.sqrt(file)
         return file
@@ -166,15 +166,21 @@ class NewForecastArray(object):
         data = data.where(np.logical_and(data.longitude>=np.min(lons), data.longitude<=np.max(lons)), drop=True)
         data = data.where(np.logical_and(data.latitude>=np.min(lats), data.latitude<=np.max(lats)), drop=True)
         return data
-
+        
+    def _rename_latlon(self, forecast):
+        forecast = forecast.rename_dims({'latitude':'lat','longitude':'lon'}).rename_vars({'latitude':'lat','longitude':'lon'})
+        return forecast
+  
     def load_forecast(self, subset_lat=None, subset_lon=None):
         new_gefs = cfgrib.open_datasets(f'{ps.data_store}gefs_{self.stat}_{self.fhour:03}.grib2')
         subset_gefs = self._get_var(new_gefs)
+        subset_gefs = self._rename_latlon(subset_gefs)
         try:
             subset_gefs = self._subset_latlon(subset_gefs, subset_lat, subset_lon)
         except:
             pass
         self.date = str(subset_gefs.time.values).partition('T')[0]
+        
         return subset_gefs
         
 def xarr_interpolate(original, new, on='latlon'):
@@ -188,7 +194,26 @@ def xarr_interpolate(original, new, on='latlon'):
     else:
         raise Exception('latlon interpolation only works as of now...')
 
+def percentile(mclimate, forecast):
 
+    forecast = forecast.expand_dims(dim='time')
+    forecast = forecast.drop(['step','meanSea','valid_time'])
+    new_stacked = xr.concat([mclimate[[n for n in mclimate][0]], forecast[[n for n in forecast][0]]],'time')
+    new_stacked = new_stacked.compute()
+    percentile = new_stacked.rank('time')/len(new_stacked['time'])
+    return percentile
+
+def subset_sprd(combined_fcst_mcli, mcli_sprd):
+    new_perc = combined_fcst_mcli.where(np.logical_and(combined_fcst_mcli >= combined_fcst_mcli.isel(time=-1)-0.05, combined_fcst_mcli <= combined_fcst_mcli.isel(time=-1)+0.05),drop=True)
+    mcli_sprd = mcli_sprd[[n for n in mcli_sprd][0]]
+    mcli_sprd = mcli_sprd.where(~np.isnan(new_perc[:-1]),drop=True)
+    return mcli_sprd
+
+def hsa_transform(gefs_sprd, subset):
+    subset_vals = (gefs_sprd.rename({'prmsl':'Pressure','latitude':'lat','longitude':'lon'}) - subset.mean('time'))/subset.std('time')
+    subset_vals = (0.99-(-0.99))*(subset_vals-subset_vals.min())/(subset_vals.max()-subset_vals.min()) + -0.99
+    subset_vals = np.arctanh(subset_vals)
+    return subset_vals
 
 def hsa(variable):
     with open(ps.log_directory + 'current_run.txt', "r") as f:
@@ -196,10 +221,16 @@ def hsa(variable):
     lons = np.arange(180,310.1,0.5)
     lats = np.arange(20,80.1,0.5)
     for f in range(0,169,6):
-        print(f)
-        nfa = NewForecastArray('mean', 'slp', f)
-        gefs = nfa.load_forecast(subset_lat=lats,subset_lon=lons)
+        nfa_mean = NewForecastArray('mean', variable, f)
+        gefs_mean = nfa_mean.load_forecast(subset_lat=lats,subset_lon=lons)
+        nfa_sprd = NewForecastArray('sprd', variable, f)
+        gefs_sprd = nfa_sprd.load_forecast(subset_lat=lats,subset_lon=lons)
         mc = MClimate(model_date, variable, f, percentage=10)
-        mc_mu = xarr_interpolate(mc.generate(type='mean',dask=True),gefs)
-        mc_std = xarr_interpolate(mc.generate(type='sprd',dask=True),gefs)
-    return mc_mu, gefs
+        mc_mu = xarr_interpolate(mc.generate(type='mean',dask=True),gefs_mean)
+        mc_std = xarr_interpolate(mc.generate(type='sprd',dask=True),gefs_mean)
+
+        percentiles = percentile(mc_mu, gefs)
+        subset = subset_sprd(percentiles, mc_std)
+        hsa_final = hsa_transform(gefs_sprd, subset)
+        
+    return subset
