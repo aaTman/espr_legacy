@@ -1,7 +1,6 @@
 import numpy as np 
 import xarray as xr
 import xarray.ufuncs as xu
-import pygrib as pg 
 from bisect import bisect
 from scipy.stats import percentileofscore
 import paths as ps
@@ -120,7 +119,6 @@ class MClimate(object):
 class NewForecastArray(object):
     def __init__(self, stat: str, variable: str, fhour: int):
         self.variable = variable
-        
         if self.variable in self._var_list():
             pass
         else:
@@ -163,8 +161,8 @@ class NewForecastArray(object):
         return subset_variable
         
     def _subset_latlon(self, data, lats, lons):
-        data = data.where(np.logical_and(data.longitude>=np.min(lons), data.longitude<=np.max(lons)), drop=True)
-        data = data.where(np.logical_and(data.latitude>=np.min(lats), data.latitude<=np.max(lats)), drop=True)
+        data = data.where(np.logical_and(data.lon>=np.min(lons), data.lon<=np.max(lons)), drop=True)
+        data = data.where(np.logical_and(data.lat>=np.min(lats), data.lat<=np.max(lats)), drop=True)
         return data
         
     def _rename_latlon(self, forecast):
@@ -178,6 +176,7 @@ class NewForecastArray(object):
         try:
             subset_gefs = self._subset_latlon(subset_gefs, subset_lat, subset_lon)
         except:
+            print('error trying to subset lats and lons')
             pass
         self.date = str(subset_gefs.time.values).partition('T')[0]
         
@@ -228,9 +227,7 @@ def hsa(variable):
         mc = MClimate(model_date, variable, f, percentage=10)
         mc_mu = xarr_interpolate(mc.generate(type='mean',dask=True),gefs_mean)
         mc_std = xarr_interpolate(mc.generate(type='sprd',dask=True),gefs_mean)
-
         percentiles = percentile(mc_mu, gefs)
         subset = subset_sprd(percentiles, mc_std)
         hsa_final = hsa_transform(gefs_sprd, subset)
-        
-    return subset
+    return hsa_final
