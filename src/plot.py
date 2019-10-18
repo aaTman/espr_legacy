@@ -13,10 +13,12 @@ class NorthAmerica:
             self.levels = levels
         else:
             self.levels = np.linspace(-3,3,13)
+        if 'ens_mean' in kwargs:
+            self.ens_mean = ens_mean
         self.map = self._generate_map()
 
     def _generate_map(self):
-        fig, ax = plt.subplots(figsize=(20,10), subplot_kw={'projection': ccrs.PlateCarree()})
+        fig, ax = plt.subplots(figsize=(20,10), subplot_kw={'projection': ccrs.Miller()})
         ax.add_feature(cf.NaturalEarthFeature(
             'cultural', 'admin_1_states_provinces_lines', '50m',
             edgecolor='gray', facecolor='none'))
@@ -31,37 +33,39 @@ class NorthAmerica:
         ax.coastlines(resolution='50m')
         return ax
 
-def plot_variable(hsa, variable, input_map, **args)
+def plot_variable(hsa, input_map):
 
-    hsa.where(np.abs(hsa[variable]) > 0.5)[variable].plot.contourf(
+    hsa.where(np.abs(hsa) > 0.5).plot.contourf(
         ax=input_map.map,
         transform=ccrs.PlateCarree(),
         levels=input_map.levels,
         add_colorbar=False,
         alpha=0.9
     )
-    if 'var_map' in args:
-        var_map = var_map
-        var_map.plot.contour(
-        ax=input_map.map,
-        transform=ccrs.PlateCarree(),
-        levels=input_map.levels,
-        add_colorbar=False,
-        colors='k',
-        alpha=0.9
-    )
+    
+    # if 'var_map' in args:
+    #     var_map = var_map
+    #     var_map.plot.contour(
+    #     ax=input_map.map,
+    #     transform=ccrs.PlateCarree(),
+    #     levels=input_map.levels,
+    #     add_colorbar=False,
+    #     colors='k',
+    #     alpha=0.9
+    # )
 
-    date = hsa[variable].valid_time.dt.strftime("%Y/%m/%d %Hz").values
-    step = hsa[variable].step.values.astype("timedelta64[h]")/np.timedelta64(1, "h")
-    input_map.map.set_title(f'HISTORICAL SPREAD ANOMALY, {variable}',
+    date = hsa.valid_time.dt.strftime("%Y/%m/%d %Hz").values
+    step = hsa.step.values.astype("timedelta64[h]")/np.timedelta64(1, "h")
+    input_map.map.set_title(f'HISTORICAL SPREAD ANOMALY',
     fontproperties=input_map.font,
     fontsize=16,
     loc='left')
-    input_map.set_title(f'FHOUR: {step:2.0f}',
+    input_map.map.set_title(f'FHOUR: {step:2.0f}',
     fontproperties=input_map.font_bold,
     fontsize=14,
     loc='center')
-    input_map.map.set_title(f'VALID: {date_title}',
+    input_map.map.set_title(f'VALID: {date}',
     fontproperties=input_map.font_bold,
     fontsize=14,
     loc='right')
+    plt.savefig('test.png',bbox_inches='tight',dpi=300)

@@ -11,7 +11,8 @@ def monitor(server, directory, temp_store):
         try:
             old_date, old_run, _ = f.readlines()[-1].split('_')
         except IndexError:
-            pass
+            old_date = 0
+            old_run = 0
     ftp = FTP(server)
     ftp.login()
     
