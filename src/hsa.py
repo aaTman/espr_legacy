@@ -191,9 +191,9 @@ class NewForecastArray(object):
             subset_variable = subset_variable.drop(['heightAboveGround'])
 
         elif self.variable == 'tmp925':
-            subset_variable = [n for n in data if 't' in n][0]['t'].sel(isobaricInhPa=925) + 273.15
+            subset_variable = [n for n in data if 't' in n][0]['t'].sel(isobaricInhPa=925) - 273.15
         elif self.variable == 'tmp850':
-            subset_variable = [n for n in data if 't' in n][0]['t'].sel(isobaricInhPa=850) + 273.15
+            subset_variable = [n for n in data if 't' in n][0]['t'].sel(isobaricInhPa=850) - 273.15
         else:
             subset_variable = [m for m in data if self.variable in m][0]
         return subset_variable
@@ -270,7 +270,7 @@ def hsa_transform(gefs_sprd, subset):
     subset_vals = np.arctanh(subset_vals)
     return subset_vals
 
-def hsa(variable):
+def hsa(variable, hourf=168):
     with open(ps.log_directory + 'current_run.txt', "r") as f:
         model_date=datetime.datetime.strptime(f.readlines()[-1][5:13],'%Y%m%d')
     lons = np.arange(180,310.1,0.5)
@@ -281,8 +281,7 @@ def hsa(variable):
         var_vals = np.linspace(-40, 40, 4)
     elif variable == 'wnd':
         var_vals = np.linspace(-100,100, 4)
-    na = plot.NorthAmerica(ens_mean=var_vals)
-    for f in range(0,169,6):
+    for f in range(0,hourf+1,6):
         nfa_mean = NewForecastArray('mean', variable, f)
         gefs_mean = nfa_mean.load_forecast(subset_lat=lats,subset_lon=lons)
         nfa_sprd = NewForecastArray('sprd', variable, f)
@@ -290,8 +289,8 @@ def hsa(variable):
         mc = MClimate(model_date, variable, f, percentage=10)
         mc_mu = xarr_interpolate(mc.generate(type='mean',dask=True),gefs_mean)
         mc_std = xarr_interpolate(mc.generate(type='sprd',dask=True),gefs_mean)
-        percentiles = percentile(mc_mu, gefs)
+        percentiles = percentile(mc_mu, gefs_mean)
         subset = subset_sprd(percentiles, mc_std)
         hsa_final = hsa_transform(gefs_sprd, subset)
-        plot.plot_variable(hsa_final, variable, gefs_mean)
+        plot.NorthAmerica(hsa_final, gefs_mean, variable)
     return hsa_final

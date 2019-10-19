@@ -4,18 +4,35 @@ import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import paths as ps 
 import numpy as np
+import xarray as xr 
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 class NorthAmerica:
-    def __init__(self,**kwargs):
+    def __init__(self, hsa, input_map, variable):
+        self.hsa = self._convert_to_da(hsa)
+        self.input_map = self._convert_to_da(input_map)
         self.font = fm.FontProperties(fname=ps.fpath)
         self.font_bold = fm.FontProperties(fname=ps.fpath_bold)
-        if 'levels' in kwargs:
-            self.levels = levels
+        self.levels = np.linspace(-3,3,13)
+        self.variable_range = self._set_variable_range(variable)
+        self._generate_map()
+        
+    def _convert_to_da(self, array):
+        if type(array) == xr.Dataset:
+            array = array[[n for n in array][0]]
+            return array
         else:
-            self.levels = np.linspace(-3,3,13)
-        if 'ens_mean' in kwargs:
-            self.ens_mean = ens_mean
-        self.map = self._generate_map()
+            return array
+            
+    def _set_variable_range(self, variable):
+        if variable == 'slp':
+            return np.arange(900,1100,4)
+        elif variable == 'pwat':
+            return np.arange(0,100,2)
+        elif variable == 'wnd':
+            return np.arange(0,150,2)
+        elif 'tmp' in variable:
+            return np.arange(-50,50,4)
 
     def _generate_map(self):
         fig, ax = plt.subplots(figsize=(20,10), subplot_kw={'projection': ccrs.Miller()})
@@ -31,41 +48,75 @@ class NorthAmerica:
         ax.add_feature(cf.OCEAN, facecolor='gray')
         ax.set_extent([-180,-50,20,65])
         ax.coastlines(resolution='50m')
-        return ax
+        self.hsa = self.hsa.rename('Sigma')
+        c = self.hsa.where(np.abs(self.hsa) > 1).plot.contourf(
+            ax=ax,
+            transform=ccrs.PlateCarree(),
+            levels=self.levels,
+            add_colorbar=True,
+            cbar_kwargs={'pad':0.001, 'aspect':30},
+            alpha=0.9
+        )
+        cl = (self.input_map/100).plot.contour(
+            ax=ax,
+            colors = 'k',
+            transform=ccrs.PlateCarree(),
+            levels=self.variable_range,
+            add_colorbar=False,
+            alpha=0.9,
+            linewidths=0.5
+        )
+        ax.clabel(cl, fmt='%3.0f')
+        date = self.hsa.valid_time.dt.strftime("%Y/%m/%d %Hz").values
+        step = self.hsa.step.values.astype("timedelta64[h]")/np.timedelta64(1, "h")
+        ax.set_title(f'HISTORICAL SPREAD ANOMALY',
+        fontproperties=self.font,
+        fontsize=16,
+        loc='left')
+        ax.set_title(f'FHOUR: {step:3.0f}',
+        fontproperties=self.font_bold,
+        fontsize=14,
+        loc='center')
+        ax.set_title(f'VALID: {date}',
+        fontproperties=self.font_bold,
+        fontsize=14,
+        loc='right')
+        plt.savefig(f'../images/{variable}_{step:3.0f}.png',bbox_inches='tight',dpi=300)
+            
 
-def plot_variable(hsa, input_map):
+# def plot_variable(hsa, input_map):
 
-    hsa.where(np.abs(hsa) > 0.5).plot.contourf(
-        ax=input_map.map,
-        transform=ccrs.PlateCarree(),
-        levels=input_map.levels,
-        add_colorbar=False,
-        alpha=0.9
-    )
+#     hsa.where(np.abs(hsa) > 0.5).plot.contourf(
+#         ax=ax,
+#         transform=ccrs.PlateCarree(),
+#         levels=input_map.levels,
+#         add_colorbar=False,
+#         alpha=0.9
+#     )
     
-    # if 'var_map' in args:
-    #     var_map = var_map
-    #     var_map.plot.contour(
-    #     ax=input_map.map,
-    #     transform=ccrs.PlateCarree(),
-    #     levels=input_map.levels,
-    #     add_colorbar=False,
-    #     colors='k',
-    #     alpha=0.9
-    # )
+#     # if 'var_map' in args:
+#     #     var_map = var_map
+#     #     var_map.plot.contour(
+#     #     ax=ax,
+#     #     transform=ccrs.PlateCarree(),
+#     #     levels=input_map.levels,
+#     #     add_colorbar=False,
+#     #     colors='k',
+#     #     alpha=0.9
+#     # )
 
-    date = hsa.valid_time.dt.strftime("%Y/%m/%d %Hz").values
-    step = hsa.step.values.astype("timedelta64[h]")/np.timedelta64(1, "h")
-    input_map.map.set_title(f'HISTORICAL SPREAD ANOMALY',
-    fontproperties=input_map.font,
-    fontsize=16,
-    loc='left')
-    input_map.map.set_title(f'FHOUR: {step:2.0f}',
-    fontproperties=input_map.font_bold,
-    fontsize=14,
-    loc='center')
-    input_map.map.set_title(f'VALID: {date}',
-    fontproperties=input_map.font_bold,
-    fontsize=14,
-    loc='right')
-    plt.savefig('test.png',bbox_inches='tight',dpi=300)
+#     date = hsa.valid_time.dt.strftime("%Y/%m/%d %Hz").values
+#     step = hsa.step.values.astype("timedelta64[h]")/np.timedelta64(1, "h")
+#     ax.set_title(f'HISTORICAL SPREAD ANOMALY',
+#     fontproperties=input_map.font,
+#     fontsize=16,
+#     loc='left')
+#     ax.set_title(f'FHOUR: {step:2.0f}',
+#     fontproperties=input_map.font_bold,
+#     fontsize=14,
+#     loc='center')
+#     ax.set_title(f'VALID: {date}',
+#     fontproperties=input_map.font_bold,
+#     fontsize=14,
+#     loc='right')
+#     plt.savefig('test.png',bbox_inches='tight',dpi=300)

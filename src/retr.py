@@ -3,6 +3,7 @@ import numpy as np
 from datetime import datetime
 import paths as ps 
 import os
+import hsa
 
 def retr_files(ftp, temp_store):
     log_directory = ps.log_directory
@@ -33,4 +34,8 @@ def retr_files(ftp, temp_store):
 
     [os.remove(os.path.join(temp_store,n)) for n in os.listdir(temp_store) if '.idx' in n]
 
-         
+    hsa.hsa('slp')
+    hsa.hsa('wnd')
+    hsa.hsa('tmp850')
+    hsa.hsa('tmp925')
+    hsa.hsa('pwat')
