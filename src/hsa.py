@@ -140,22 +140,23 @@ class MClimate(object):
 class NewForecastArray(object):
     def __init__(self, stat: str, variable: str, fhour: int):
         self.variable = variable
-        if self.variable in self._var_list():
-            pass
-        else:
-            self._convert_variable()
+        self._convert_variable()
         self.fhour = fhour
         self.stat = stat
-        if self.variable in self._stat_list():
+        if self.stat in self._stat_list():
             pass
         else:
             self._convert_stat()
     def _convert_variable(self):
-        if self.variable in ['slp','psl']:
+        if self.variable in ['slp','psl','prmsl']:
             self.variable = 'prmsl'
-        elif 'precip' in self.variable:
+            self.key_filter = {'typeOfLevel':'meanSea'}
+        elif self.variable in ['precip','pwat']:
             self.variable = 'pwat'
+            self.key_filter = {'typeOfLevel':'unknown'}
         elif self.variable in ['temp','tmp']:
+            self.key_filter = {'typeOfLevel':'isobaricInhPa'}
+            self.short_name = 't'
             if '925' in self.variable:
                 self.variable = 'tmp925'
             elif '850' in self.variable:
@@ -164,6 +165,7 @@ class NewForecastArray(object):
                 raise Exception('Temperature level must be indicated (925 or 850)')
         elif 'wind' in self.variable:
             self.variable = 'wnd'
+            self.key_filter = {'typeOfLevel': 'heightAboveGround', 'level': 10}
     
     def _convert_stat(self):
         if self.stat in {'avg','mu'}:
@@ -186,16 +188,15 @@ class NewForecastArray(object):
     
     def _get_var(self, data):
         if self.variable == 'wnd':
-            subset_variable = [n for n in data if 'v10' in n][0]
             subset_variable = xu.sqrt(subset_variable[[n for n in subset_variable.data_vars][0]]**2+subset_variable[[n for n in subset_variable.data_vars][1]]**2)
             subset_variable = subset_variable.drop(['heightAboveGround'])
 
         elif self.variable == 'tmp925':
-            subset_variable = [n for n in data if 't' in n][0]['t'].sel(isobaricInhPa=925) - 273.15
+            subset_variable = data['t'].sel(isobaricInhPa=925) - 273.15
         elif self.variable == 'tmp850':
-            subset_variable = [n for n in data if 't' in n][0]['t'].sel(isobaricInhPa=850) - 273.15
+            subset_variable = data['t'].sel(isobaricInhPa=850) - 273.15
         else:
-            subset_variable = [m for m in data if self.variable in m][0]
+            subset_variable = data
         return subset_variable
         
     def _subset_latlon(self, data, lats, lons):
@@ -211,9 +212,9 @@ class NewForecastArray(object):
         return forecast
   
     def load_forecast(self, subset_lat=None, subset_lon=None):
-        new_gefs = cfgrib.open_datasets(f'{ps.data_store}gefs_{self.stat}_{self.fhour:03}.grib2')
+        new_gefs = xr.open_dataset(f'{ps.data_store}gefs_{self.stat}_{self.fhour:03}.grib2',engine='cfgrib',backend_kwargs=dict(filter_by_keys=self.key_filter))
         subset_gefs = self._get_var(new_gefs)
-        subset_gefs = self._rename_latlon(subset_gefs)
+        subset_gefs = self._rename_latlon(new_gefs)
         try:
             subset_gefs = self._subset_latlon(subset_gefs, subset_lat, subset_lon)
         except:

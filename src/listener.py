@@ -4,6 +4,7 @@ from retr import retr_files
 from datetime import datetime
 import paths as ps
 import sys
+import main
 
 def monitor(server, directory, temp_store):
     log_directory = ps.log_directory
@@ -30,6 +31,7 @@ def monitor(server, directory, temp_store):
         if any('.f168' in s for s in ftp.nlst()):
             print('beginning to retrieve files at ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S')) 
             retr_files(ftp,temp_store)
+            main.run_hsa()
             old_date = new_date
             old_run = new_run
             with open(log_directory + 'current_run.txt', "a") as f:

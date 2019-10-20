@@ -9,12 +9,13 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 class NorthAmerica:
     def __init__(self, hsa, input_map, variable):
+        self.variable = variable
         self.hsa = self._convert_to_da(hsa)
         self.input_map = self._convert_to_da(input_map)
         self.font = fm.FontProperties(fname=ps.fpath)
         self.font_bold = fm.FontProperties(fname=ps.fpath_bold)
         self.levels = np.linspace(-3,3,13)
-        self.variable_range = self._set_variable_range(variable)
+        self.variable_range = self._set_variable_range()
         self._generate_map()
         
     def _convert_to_da(self, array):
@@ -24,14 +25,14 @@ class NorthAmerica:
         else:
             return array
             
-    def _set_variable_range(self, variable):
-        if variable == 'slp':
+    def _set_variable_range(self):
+        if self.variable == 'slp':
             return np.arange(900,1100,4)
-        elif variable == 'pwat':
+        elif self.variable == 'pwat':
             return np.arange(0,100,2)
-        elif variable == 'wnd':
+        elif self.variable == 'wnd':
             return np.arange(0,150,2)
-        elif 'tmp' in variable:
+        elif 'tmp' in self.variable:
             return np.arange(-50,50,4)
 
     def _generate_map(self):
@@ -81,7 +82,7 @@ class NorthAmerica:
         fontproperties=self.font_bold,
         fontsize=14,
         loc='right')
-        plt.savefig(f'../images/{variable}_{step:3.0f}.png',bbox_inches='tight',dpi=300)
+        plt.savefig(f'{ps.plot_dir}{self.variable}_{step:.0f}.png',bbox_inches='tight',dpi=300)
             
 
 # def plot_variable(hsa, input_map):

@@ -1,6 +1,7 @@
 /temp
 /logs
 /reforecast
+/images
 *.pyc
 i
 /src/*.ipynb*

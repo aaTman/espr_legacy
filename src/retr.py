@@ -32,10 +32,5 @@ def retr_files(ftp, temp_store):
     with open(log_directory + 'retrieval_log.txt', "a") as f:
         f.write('completed at ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S')+'\n')
 
-    [os.remove(os.path.join(temp_store,n)) for n in os.listdir(temp_store) if '.idx' in n]
+    # [os.remove(os.path.join(temp_store,n)) for n in os.listdir(temp_store) if '.idx' in n]
 
-    hsa.hsa('slp')
-    hsa.hsa('wnd')
-    hsa.hsa('tmp850')
-    hsa.hsa('tmp925')
-    hsa.hsa('pwat')
