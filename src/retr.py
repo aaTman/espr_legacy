@@ -32,5 +32,5 @@ def retr_files(ftp, temp_store):
     with open(log_directory + 'retrieval_log.txt', "a") as f:
         f.write('completed at ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S')+'\n')
 
-    # [os.remove(os.path.join(temp_store,n)) for n in os.listdir(temp_store) if '.idx' in n]
+    
 

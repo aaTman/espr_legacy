@@ -50,24 +50,54 @@ class NorthAmerica:
         ax.set_extent([-180,-50,20,65])
         ax.coastlines(resolution='50m')
         self.hsa = self.hsa.rename('Sigma')
-        c = self.hsa.where(np.abs(self.hsa) > 1).plot.contourf(
-            ax=ax,
-            transform=ccrs.PlateCarree(),
-            levels=self.levels,
-            add_colorbar=True,
-            cbar_kwargs={'pad':0.001, 'aspect':30},
-            alpha=0.9
-        )
-        cl = (self.input_map/100).plot.contour(
-            ax=ax,
-            colors = 'k',
-            transform=ccrs.PlateCarree(),
-            levels=self.variable_range,
-            add_colorbar=False,
-            alpha=0.9,
-            linewidths=0.5
-        )
-        ax.clabel(cl, fmt='%3.0f')
+        try:
+            c = self.hsa.where(np.abs(self.hsa) > 0.5).plot.contourf(
+                ax=ax,
+                transform=ccrs.PlateCarree(),
+                levels=self.levels,
+                add_colorbar=True,
+                cbar_kwargs={'pad':0.001, 'aspect':30},
+                alpha=0.9
+            )
+        except ValueError:
+            pass
+        try:
+            if self.variable == 'slp':
+                cl = (self.input_map/100).plot.contour(
+                    ax=ax,
+                    colors = 'k',
+                    transform=ccrs.PlateCarree(),
+                    levels=self.variable_range,
+                    add_colorbar=False,
+                    linewidths=0.5)
+            else:
+                cl = self.input_map.plot.contour(
+                ax=ax,
+                colors = 'k',
+                transform=ccrs.PlateCarree(),
+                levels=self.variable_range,
+                add_colorbar=False,
+                linewidths=0.5
+            )
+            ax.clabel(cl, fmt='%3.0f')
+        except:
+            if self.variable == 'slp':
+                (self.input_map/100).plot.contour(
+                    ax=ax,
+                    colors = 'k',
+                    transform=ccrs.PlateCarree(),
+                    levels=self.variable_range,
+                    add_colorbar=False,
+                    linewidths=0.5)
+            else:
+                self.input_map.plot.contour(
+                ax=ax,
+                colors = 'k',
+                transform=ccrs.PlateCarree(),
+                levels=self.variable_range,
+                add_colorbar=False,
+                linewidths=0.5
+            )        
         date = self.hsa.valid_time.dt.strftime("%Y/%m/%d %Hz").values
         step = self.hsa.step.values.astype("timedelta64[h]")/np.timedelta64(1, "h")
         ax.set_title(f'HISTORICAL SPREAD ANOMALY',
@@ -82,8 +112,11 @@ class NorthAmerica:
         fontproperties=self.font_bold,
         fontsize=14,
         loc='right')
-        plt.savefig(f'{ps.plot_dir}{self.variable}_{step:.0f}.png',bbox_inches='tight',dpi=300)
-            
+        try:
+            plt.savefig(f'{ps.plot_dir}{self.variable}_{step:.0f}.png',bbox_inches='tight',dpi=150)
+        except:
+            pass
+        plt.close('all')
 
 # def plot_variable(hsa, input_map):
 

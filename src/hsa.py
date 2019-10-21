@@ -9,6 +9,7 @@ import datetime
 import cfgrib
 from dask.diagnostics import ProgressBar
 import plot
+from tqdm import tqdm
 
 class MClimate(object):
     """
@@ -129,9 +130,9 @@ class MClimate(object):
         file = xr.concat([file.sel(time=n) for n in date_range], dim='time')
         return file
 
-    def generate(self,type='mean',dask=False):
+    def generate(self,stat='mean',dask=False):
         try:
-            xarr = self._retrieve_from_xr(type, dask=dask)
+            xarr = self._retrieve_from_xr(stat, dask=dask)
         except:
             raise Exception('type must be mean or sprd')
         return xarr
@@ -154,8 +155,8 @@ class NewForecastArray(object):
         elif self.variable in ['precip','pwat']:
             self.variable = 'pwat'
             self.key_filter = {'typeOfLevel':'unknown'}
-        elif self.variable in ['temp','tmp']:
-            self.key_filter = {'typeOfLevel':'isobaricInhPa'}
+        elif self.variable in ['temp','tmp','tmp850','tmp925']:
+            self.key_filter = {'typeOfLevel':'isobaricInhPa','shortName': 't'}
             self.short_name = 't'
             if '925' in self.variable:
                 self.variable = 'tmp925'
@@ -163,7 +164,7 @@ class NewForecastArray(object):
                 self.variable = 'tmp850'
             else:
                 raise Exception('Temperature level must be indicated (925 or 850)')
-        elif 'wind' in self.variable:
+        elif self.variable in ['wnd', 'wind', 'sfc_wind', '10m_wnd', 'u10', 'v10']:
             self.variable = 'wnd'
             self.key_filter = {'typeOfLevel': 'heightAboveGround', 'level': 10}
     
@@ -188,9 +189,9 @@ class NewForecastArray(object):
     
     def _get_var(self, data):
         if self.variable == 'wnd':
-            subset_variable = xu.sqrt(subset_variable[[n for n in subset_variable.data_vars][0]]**2+subset_variable[[n for n in subset_variable.data_vars][1]]**2)
+            subset_variable = xu.sqrt(data[[n for n in data.data_vars][0]]**2+data[[n for n in data.data_vars][1]]**2)
             subset_variable = subset_variable.drop(['heightAboveGround'])
-
+        
         elif self.variable == 'tmp925':
             subset_variable = data['t'].sel(isobaricInhPa=925) - 273.15
         elif self.variable == 'tmp850':
@@ -212,7 +213,10 @@ class NewForecastArray(object):
         return forecast
   
     def load_forecast(self, subset_lat=None, subset_lon=None):
-        new_gefs = xr.open_dataset(f'{ps.data_store}gefs_{self.stat}_{self.fhour:03}.grib2',engine='cfgrib',backend_kwargs=dict(filter_by_keys=self.key_filter))
+        try:
+            new_gefs = xr.open_dataset(f'{ps.data_store}gefs_{self.stat}_{self.fhour:03}.grib2',engine='cfgrib',backend_kwargs=dict(filter_by_keys=self.key_filter))
+        except KeyError:
+            new_gefs = xr.open_dataset(f'{ps.data_store}gefs_{self.stat}_{self.fhour:03}.grib2',engine='cfgrib',backend_kwargs=dict(filter_by_keys=self.key_filter))
         subset_gefs = self._get_var(new_gefs)
         subset_gefs = self._rename_latlon(new_gefs)
         try:
@@ -236,8 +240,9 @@ def xarr_interpolate(original, new, on='latlon'):
         raise Exception('latlon interpolation only works as of now...')
 
 def percentile(mclimate, forecast):
+    
     forecast = forecast.expand_dims(dim='time')
-    vars = ['step','meanSea','valid_time','isobaricInhPa', 'pressure']
+    vars = ['step','meanSea','valid_time','isobaricInhPa', 'pressure', 'heightAboveGround']
     for var in vars:
         try:
             forecast = forecast.drop([var])
@@ -250,7 +255,7 @@ def percentile(mclimate, forecast):
     try:
         new_stacked = xr.concat([mclimate[[n for n in mclimate][0]], forecast[[n for n in forecast][0]]],'time')
     except TypeError:
-        new_stacked = xr.concat([mclimate[[n for n in mclimate][0]], forecast],'time')
+        new_stacked = xr.concat([mclimate, forecast[[n for n in forecast][0]]],'time')
 
     new_stacked = new_stacked.compute()
     percentile = new_stacked.rank('time')/len(new_stacked['time'])
@@ -287,9 +292,10 @@ def hsa(variable, hourf=168):
         gefs_mean = nfa_mean.load_forecast(subset_lat=lats,subset_lon=lons)
         nfa_sprd = NewForecastArray('sprd', variable, f)
         gefs_sprd = nfa_sprd.load_forecast(subset_lat=lats,subset_lon=lons)
-        mc = MClimate(model_date, variable, f, percentage=10)
-        mc_mu = xarr_interpolate(mc.generate(type='mean',dask=True),gefs_mean)
-        mc_std = xarr_interpolate(mc.generate(type='sprd',dask=True),gefs_mean)
+        mc = MClimate(model_date, variable, f)
+        mc_mu = xarr_interpolate(mc.generate(stat='mean',dask=True),gefs_mean)
+        mc = MClimate(model_date, variable, f)
+        mc_std = xarr_interpolate(mc.generate(stat='sprd',dask=True),gefs_mean)
         percentiles = percentile(mc_mu, gefs_mean)
         subset = subset_sprd(percentiles, mc_std)
         hsa_final = hsa_transform(gefs_sprd, subset)
