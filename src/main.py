@@ -4,6 +4,9 @@ import warnings
 import os
 import paths as ps
 warnings.filterwarnings("ignore")
+from datetime import datetime, timedelta
+from concurrent.futures import ProcessPoolExecutor
+import numpy as np
 
 # Define a context manager to suppress stdout and stderr.
 class suppress_stdout_stderr(object):
@@ -36,14 +39,30 @@ class suppress_stdout_stderr(object):
             os.close(fd)
 
 def run_hsa():
-    [os.remove(os.path.join(ps.data_store,n)) for n in os.listdir(ps.data_store) if '.idx' in n]
-    hsa.hsa('slp')
-    hsa.hsa('wnd')
-    hsa.hsa('tmp850')
-    hsa.hsa('tmp925')
-    hsa.hsa('pwat')  
 
+    [os.remove(os.path.join(ps.data_store,n)) for n in os.listdir(ps.data_store) if '.idx' in n]
+    wx_vars = ['slp','wnd','tmp850','tmp925','pwat']
+    now = datetime.now()
+
+    for v in wx_vars:
+        hsa.hsa(v)
+    with open(ps.log_directory + 'timing_log.txt', "a") as f:
+        f.write(f'single process total is {np.round((datetime.now() - now).total_seconds(),2)}\n')
+
+def multi_thread():
+    [os.remove(os.path.join(ps.data_store,n)) for n in os.listdir(ps.data_store) if '.idx' in n]
+    wx_vars = ['slp','wnd','tmp850','tmp925','pwat']
+    now = datetime.now()
+    with ProcessPoolExecutor(4) as executor:
+            executor.submit(hsa.hsa_vectorized,wx_vars[0])
+            executor.submit(hsa.hsa_vectorized,wx_vars[1])
+            executor.submit(hsa.hsa_vectorized,wx_vars[2])
+            executor.submit(hsa.hsa_vectorized,wx_vars[3])
+            executor.submit(hsa.hsa_vectorized,wx_vars[4])
+    with open(ps.log_directory + 'timing_log.txt', "a") as f:
+        f.write(f'{datetime.now().strftime("%Y/%m/%d %H:%M:%S")} multiprocessing total is {np.round((datetime.now() - now).total_seconds(),2)}\n')
+    [os.remove(os.path.join(ps.data_store,n)) for n in os.listdir(ps.data_store) if '.idx' in n]
 if __name__ == "__main__":
-    vars = ['slp','wnd','tmp850','tmp925','pwat']
+    vars = ['pwat']
     for v in vars:
         hsa.hsa(v)

@@ -112,10 +112,7 @@ class NorthAmerica:
         fontproperties=self.font_bold,
         fontsize=14,
         loc='right')
-        try:
-            plt.savefig(f'{ps.plot_dir}{self.variable}_{step:.0f}.png',bbox_inches='tight',dpi=150)
-        except:
-            pass
+        plt.savefig(f'{ps.plot_dir}{self.variable}_{step:.0f}.png',bbox_inches='tight',dpi=150)
         plt.close('all')
 
 # def plot_variable(hsa, input_map):

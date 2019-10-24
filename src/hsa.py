@@ -1,15 +1,11 @@
 import numpy as np 
 import xarray as xr
 import xarray.ufuncs as xu
-from bisect import bisect
-from scipy.stats import percentileofscore
+import bottleneck
+import datetime
 import paths as ps
 import utils as ut
-import datetime
-import cfgrib
-from dask.diagnostics import ProgressBar
 import plot
-from tqdm import tqdm
 
 class MClimate(object):
     """
@@ -98,10 +94,8 @@ class MClimate(object):
                 file = xr.open_dataset(f'{ps.rfcst}/{self.variable}_{stat}_{self._date_string()}.nc')
                 file = file.sel(pressure=850)
                 file = file.drop(['pressure'])
-                print(file)
             else:
                 file = xr.open_dataset(f'{ps.rfcst}/{self.variable}_{stat}_{self._date_string()}.nc')
-
         else:
             if self.variable == 'wnd':
                 file = xr.open_mfdataset(f'{ps.rfcst}/*{self.variable}_{stat}_{self._date_string()}.nc',combine='by_coords', chunks={'time': 10})  
@@ -115,11 +109,15 @@ class MClimate(object):
                 file = file.sel(pressure=850)
             else:
                 file = xr.open_dataset(f'{ps.rfcst}/{self.variable}_{stat}_{self._date_string()}.nc', chunks={'time': 10})
-        file = file.sel(fhour=np.timedelta64(self.fhour,'h'))
+        if self.fhour:
+            file = file.sel(fhour=np.timedelta64(self.fhour,'h'))
         file = file.assign_coords(time=ut.replace_year(file.time.values, 2012))
         file = file.assign_coords({'time':file.time.values.astype('datetime64[h]')})
-        file = self._subset_time(file)   
-        file = file.drop(['intTime', 'intValidTime', 'fhour'])
+        file = self._subset_time(file)
+        if self.fhour:   
+            file = file.drop(['intTime', 'intValidTime', 'fhour'])
+        else:
+            file = file.drop(['intTime', 'intValidTime'])
         if self.variable == 'wnd':
             file = xu.sqrt(file[[n for n in file.data_vars][0]]**2+file[[n for n in file.data_vars][1]]**2)
         return file
@@ -139,7 +137,7 @@ class MClimate(object):
 
 
 class NewForecastArray(object):
-    def __init__(self, stat: str, variable: str, fhour: int):
+    def __init__(self, stat: str, variable: str, fhour: int, group: bool=False):
         self.variable = variable
         self._convert_variable()
         self.fhour = fhour
@@ -148,19 +146,24 @@ class NewForecastArray(object):
             pass
         else:
             self._convert_stat()
+        if group == True:
+            self._load_all()
+
     def _convert_variable(self):
         if self.variable in ['slp','psl','prmsl']:
             self.variable = 'prmsl'
             self.key_filter = {'typeOfLevel':'meanSea'}
         elif self.variable in ['precip','pwat']:
             self.variable = 'pwat'
-            self.key_filter = {'typeOfLevel':'unknown'}
+            self.key_filter = {'typeOfLevel':'unknown', 'level': 0}
         elif self.variable in ['temp','tmp','tmp850','tmp925']:
-            self.key_filter = {'typeOfLevel':'isobaricInhPa','shortName': 't'}
+            
             self.short_name = 't'
             if '925' in self.variable:
+                self.key_filter = {'typeOfLevel':'isobaricInhPa','level': 925, 'shortName': 't'}
                 self.variable = 'tmp925'
             elif '850' in self.variable:
+                self.key_filter = {'typeOfLevel':'isobaricInhPa','level': 850, 'shortName': 't'}
                 self.variable = 'tmp850'
             else:
                 raise Exception('Temperature level must be indicated (925 or 850)')
@@ -193,9 +196,11 @@ class NewForecastArray(object):
             subset_variable = subset_variable.drop(['heightAboveGround'])
         
         elif self.variable == 'tmp925':
-            subset_variable = data['t'].sel(isobaricInhPa=925) - 273.15
+            subset_variable = data['t'] - 273.15
         elif self.variable == 'tmp850':
-            subset_variable = data['t'].sel(isobaricInhPa=850) - 273.15
+            subset_variable = data['t'] - 273.15
+        elif self.variable == 'pwat':
+            subset_variable = data.drop(['level'])
         else:
             subset_variable = data
         return subset_variable
@@ -214,9 +219,9 @@ class NewForecastArray(object):
   
     def load_forecast(self, subset_lat=None, subset_lon=None):
         try:
-            new_gefs = xr.open_dataset(f'{ps.data_store}gefs_{self.stat}_{self.fhour:03}.grib2',engine='cfgrib',backend_kwargs=dict(filter_by_keys=self.key_filter))
+            new_gefs = xr.open_dataset(f'{ps.data_store}gefs_{self.stat}_{self.fhour:03}.grib2',engine='cfgrib',backend_kwargs=dict(filter_by_keys=self.key_filter,indexpath=''))
         except KeyError:
-            new_gefs = xr.open_dataset(f'{ps.data_store}gefs_{self.stat}_{self.fhour:03}.grib2',engine='cfgrib',backend_kwargs=dict(filter_by_keys=self.key_filter))
+            new_gefs = xr.open_dataset(f'{ps.data_store}gefs_{self.stat}_{self.fhour:03}.grib2',engine='cfgrib',backend_kwargs=dict(filter_by_keys=self.key_filter,indexpath=''))
         subset_gefs = self._get_var(new_gefs)
         subset_gefs = self._rename_latlon(new_gefs)
         try:
@@ -227,7 +232,25 @@ class NewForecastArray(object):
         self.date = str(subset_gefs.time.values).partition('T')[0]
         subset_gefs = self._map(subset_gefs)
         return subset_gefs
-        
+
+    def _load_all(self, subset_lat=None, subset_lon=None):
+        new_gefs = xr.open_mfdataset(f'{ps.data_store}*{self.stat}*.grib2',
+        engine='cfgrib',
+        combine='nested',
+        concat_dim='time',
+        backend_kwargs=dict(filter_by_keys=self.key_filter,indexpath='')
+        )
+        subset_gefs = self._get_var(new_gefs)
+        subset_gefs = self._rename_latlon(new_gefs)
+        try:
+            subset_gefs = self._subset_latlon(subset_gefs, subset_lat, subset_lon)
+        except:
+            print('error trying to subset lats and lons')
+            pass
+        self.date = str(subset_gefs.time.values).partition('T')[0]
+        subset_gefs = self._map(subset_gefs)
+        return subset_gefs
+
 def xarr_interpolate(original, new, on='latlon'):
     if on == 'latlon':
         new_lat = [i for i in new.coords if 'lat' in i][0]
@@ -240,8 +263,13 @@ def xarr_interpolate(original, new, on='latlon'):
         raise Exception('latlon interpolation only works as of now...')
 
 def percentile(mclimate, forecast):
-    
-    forecast = forecast.expand_dims(dim='time')
+
+    ## try to solve the mystery of the unconcatable dimensions with identical dimensions.....
+    try:
+        forecast = forecast.expand_dims(dim='time')
+    except ValueError:
+        forecast = forecast.rename({'time':'fhour'})
+        forecast = forecast.assign_coords(fhour=mclimate.fhour)
     vars = ['step','meanSea','valid_time','isobaricInhPa', 'pressure', 'heightAboveGround']
     for var in vars:
         try:
@@ -256,9 +284,43 @@ def percentile(mclimate, forecast):
         new_stacked = xr.concat([mclimate[[n for n in mclimate][0]], forecast[[n for n in forecast][0]]],'time')
     except TypeError:
         new_stacked = xr.concat([mclimate, forecast[[n for n in forecast][0]]],'time')
-
+    except ValueError:
+        forecast = forecast.drop(['level'])
+        new_stacked = xr.concat([mclimate[[n for n in mclimate][0]], forecast[[n for n in forecast][0]]],'time')
+    
     new_stacked = new_stacked.compute()
     percentile = new_stacked.rank('time')/len(new_stacked['time'])
+    return percentile
+
+def percentile_v(mclimate, forecast):
+    ## try to solve the mystery of the unconcatable dimensions with identical dimensions.....
+    try:
+        forecast = forecast.expand_dims(dim='time')
+    except ValueError:
+        forecast = forecast.rename({'time':'fhour'})
+        forecast = forecast.assign_coords(fhour=mclimate.fhour)
+        forecast = forecast.expand_dims(time=[mclimate.time.values[-1]])
+    vars = ['step','meanSea','valid_time','isobaricInhPa', 'pressure', 'heightAboveGround']
+    
+    for var in vars:
+        try:
+            forecast = forecast.drop([var])
+        except ValueError:
+            pass
+    try:
+        mclimate = mclimate.drop(['pressure'])
+    except ValueError:
+        pass
+    
+    try:
+        new_stacked = xr.concat([mclimate[[n for n in mclimate][0]], forecast[[n for n in forecast][0]]],'time')
+    except TypeError:
+        new_stacked = xr.concat([mclimate, forecast[[n for n in forecast][0]]],'time')
+    except ValueError:
+        forecast = forecast.drop(['level'])
+        new_stacked = xr.concat([mclimate[[n for n in mclimate][0]], forecast[[n for n in forecast][0]]],'time')
+    new_stacked = new_stacked.compute()
+    percentile = bottleneck.rankdata(new_stacked,axis=0)/len(new_stacked['time'])
     return percentile
 
 def subset_sprd(combined_fcst_mcli, mcli_sprd):
@@ -270,9 +332,23 @@ def subset_sprd(combined_fcst_mcli, mcli_sprd):
     mcli_sprd = mcli_sprd.where(~np.isnan(new_perc[:-1]),drop=True)
     return mcli_sprd
 
+def subset_sprd_v(percentile, mc_std):
+    mask = np.logical_and(percentile >= percentile[-1]-0.05, percentile <= percentile[-1]+0.05)
+    try:
+        mc_std = mc_std[[n for n in mc_std][0]]
+    except:
+        pass
+    mc_std.rename({'fhour':'time','time':'fhour'})
+    mask_da=xr.DataArray(mask[:-1], coords={'fhour':mc_std.fhour.values, 'time':mc_std.time.values, 'lat':mc_std.lat.values, 'lon':mc_std.lon.values }, dims={ 'time': len(mc_std.time), 'fhour':len(mc_std.fhour), 'lat': len(mc_std.lat), 'lon': len(mc_std.lon) })    
+    mc_std  = mc_std.where(~np.isnan(mask_da),drop=True)
+
+    return mc_std
+
 def hsa_transform(gefs_sprd, subset):
+    gefs_sprd = gefs_sprd.rename({'time':'fhour'})
+    gefs_sprd = gefs_sprd.assign_coords(fhour=subset.fhour)
     subset_vals = (gefs_sprd - subset.mean('time'))/subset.std('time')
-    subset_vals = (0.99-(-0.99))*(subset_vals-subset_vals.min())/(subset_vals.max()-subset_vals.min()) + -0.99
+    subset_vals = (0.99-(-0.99))*(subset_vals-subset_vals.min(['lat','lon']))/(subset_vals.max(['lat','lon'])-subset_vals.min(['lat','lon'])) + -0.99
     subset_vals = np.arctanh(subset_vals)
     return subset_vals
 
@@ -299,5 +375,31 @@ def hsa(variable, hourf=168):
         percentiles = percentile(mc_mu, gefs_mean)
         subset = subset_sprd(percentiles, mc_std)
         hsa_final = hsa_transform(gefs_sprd, subset)
-        plot.NorthAmerica(hsa_final, gefs_mean, variable)
+        plot.NorthAmerica(hsa_final, gefs_mean, variable) 
     return hsa_final
+
+def hsa_vectorized(variable):
+    now = datetime.datetime.now()
+    lons = np.arange(180,310.1,0.5)
+    lats = np.arange(20,80.1,0.5)
+    with open(ps.log_directory + 'current_run.txt', "r") as f:
+        model_date=datetime.datetime.strptime(f.readlines()[-1][5:13],'%Y%m%d')
+    
+    nfa_mean = NewForecastArray('mean',variable, None)
+    gefs_mean = nfa_mean._load_all(subset_lat=lats,subset_lon=lons)
+    nfa_sprd = NewForecastArray('sprd',variable, None)
+    gefs_sprd = nfa_mean._load_all(subset_lat=lats,subset_lon=lons)
+
+    mc = MClimate(model_date, variable, None)
+    mc_mu = xarr_interpolate(mc.generate(stat='mean',dask=True),gefs_mean)
+    mc = MClimate(model_date, variable, None)
+    mc_std = xarr_interpolate(mc.generate(stat='sprd',dask=True),gefs_mean)
+
+    percentiles = percentile_v(mc_mu, gefs_mean)
+    subset = subset_sprd_v(percentiles, mc_std)
+    hsa_final = hsa_transform(gefs_sprd, subset)
+    gefs_mean = gefs_mean.rename({'time':'fhour'})
+
+    for n in range(len(hsa_final.fhour)):
+        plot.NorthAmerica(hsa_final.isel(fhour=n), gefs_mean.isel(fhour=n), variable)   
+    print(np.round((datetime.datetime.now() - now).total_seconds(),2))
