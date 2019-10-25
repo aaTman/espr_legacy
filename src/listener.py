@@ -28,17 +28,19 @@ def monitor(server, directory, temp_store):
         except ValueError:
             print('new: {}, old: not yet created '.format(new_run) + datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         ftp.cwd(new_run+'/pgrb2ap5')
-        if any('gespr.t06z.pgrb2a.0p50.f168' in s for s in ftp.nlst()):
+        if any('.f174' in s for s in ftp.nlst()):
             print('beginning to retrieve files at ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S')) 
             retr_files(ftp,temp_store)
             old_date = new_date
             old_run = new_run
             with open(log_directory + 'current_run.txt', "a") as f:
                 f.write(new_date+'_'+new_run+'_\n')
-            print('completed at ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             ftp.quit()
             # main.run_hsa()
             main.multi_thread()
+
+
+            print('completed at ' + datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     else:
         ftp.quit()
 

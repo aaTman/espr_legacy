@@ -7,7 +7,7 @@ import numpy as np
 import xarray as xr 
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-class NorthAmerica:
+class Map:
     def __init__(self, hsa, input_map, variable):
         self.variable = variable
         self.hsa = self._convert_to_da(hsa)
@@ -114,40 +114,3 @@ class NorthAmerica:
         loc='right')
         plt.savefig(f'{ps.plot_dir}{self.variable}_{step:.0f}.png',bbox_inches='tight',dpi=150)
         plt.close('all')
-
-# def plot_variable(hsa, input_map):
-
-#     hsa.where(np.abs(hsa) > 0.5).plot.contourf(
-#         ax=ax,
-#         transform=ccrs.PlateCarree(),
-#         levels=input_map.levels,
-#         add_colorbar=False,
-#         alpha=0.9
-#     )
-    
-#     # if 'var_map' in args:
-#     #     var_map = var_map
-#     #     var_map.plot.contour(
-#     #     ax=ax,
-#     #     transform=ccrs.PlateCarree(),
-#     #     levels=input_map.levels,
-#     #     add_colorbar=False,
-#     #     colors='k',
-#     #     alpha=0.9
-#     # )
-
-#     date = hsa.valid_time.dt.strftime("%Y/%m/%d %Hz").values
-#     step = hsa.step.values.astype("timedelta64[h]")/np.timedelta64(1, "h")
-#     ax.set_title(f'HISTORICAL SPREAD ANOMALY',
-#     fontproperties=input_map.font,
-#     fontsize=16,
-#     loc='left')
-#     ax.set_title(f'FHOUR: {step:2.0f}',
-#     fontproperties=input_map.font_bold,
-#     fontsize=14,
-#     loc='center')
-#     ax.set_title(f'VALID: {date}',
-#     fontproperties=input_map.font_bold,
-#     fontsize=14,
-#     loc='right')
-#     plt.savefig('test.png',bbox_inches='tight',dpi=300)
