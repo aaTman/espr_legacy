@@ -327,7 +327,12 @@ def subset_sprd(combined_fcst_mcli, mcli_sprd):
         mcli_sprd = mcli_sprd[[n for n in mcli_sprd][0]]
     except:
         pass
-    mcli_sprd = mcli_sprd.where(~np.isnan(new_perc[:-1]),drop=True)
+    try:
+        mcli_sprd = mcli_sprd.where(~np.isnan(new_perc[:-1]),drop=True)
+    except ValueError:
+        import pdb; pdb.set_trace()
+        mcli_sprd = mcli_sprd.drop(['isobaricInhPa'])
+        mcli_sprd = mcli_sprd.where(~np.isnan(new_perc[:-1]),drop=True)
     return mcli_sprd
 
 def subset_sprd_v(percentile, mc_std):
@@ -383,19 +388,25 @@ def hsa_vectorized(variable):
     with open(ps.log_directory + 'current_run.txt', "r") as f:
         model_date=datetime.datetime.strptime(f.readlines()[-1][5:16],'%Y%m%d_%H')
     
-    nfa_mean = NewForecastArray('mean',variable, None)
-    gefs_mean = nfa_mean._load_all(subset_lat=lats,subset_lon=lons)
-    nfa_sprd = NewForecastArray('sprd',variable, None)
-    gefs_sprd = nfa_mean._load_all(subset_lat=lats,subset_lon=lons)
-
-    mc = MClimate(model_date, variable, None)
-    mc_mu = xarr_interpolate(mc.generate(stat='mean',dask=True),gefs_mean)
-    mc = MClimate(model_date, variable, None)
-    mc_std = xarr_interpolate(mc.generate(stat='sprd',dask=True),gefs_mean)
-
-    percentiles = percentile_v(mc_mu, gefs_mean)
-    subset = subset_sprd_v(percentiles, mc_std)
-    hsa_final = hsa_transform(gefs_sprd, subset)
-    gefs_mean = gefs_mean.rename({'time':'fhour'})
-    hsa_final.to_netcdf(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}_{variable}_hsa.nc')
-    gefs_mean.to_netcdf(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}_{variable}_mean.nc')
+    if np.logical_and(os.path.isfile(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}_{variable}_hsa.nc'),
+    os.path.isfile(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}_{variable}_mean.nc')):
+        print('files previously saved')
+    else:
+        print('loading gefs forecasts')
+        nfa_mean = NewForecastArray('mean',variable, None)
+        gefs_mean = nfa_mean._load_all(subset_lat=lats,subset_lon=lons)
+        nfa_sprd = NewForecastArray('sprd',variable, None)
+        gefs_sprd = nfa_mean._load_all(subset_lat=lats,subset_lon=lons)
+        print('loading reforecasts')
+        mc = MClimate(model_date, variable, None)
+        mc_mu = xarr_interpolate(mc.generate(stat='mean',dask=True),gefs_mean)
+        mc = MClimate(model_date, variable, None)
+        mc_std = xarr_interpolate(mc.generate(stat='sprd',dask=True),gefs_mean)
+        print('stats time')
+        percentiles = percentile_v(mc_mu, gefs_mean)
+        subset = subset_sprd_v(percentiles, mc_std)
+        hsa_final = hsa_transform(gefs_sprd, subset)
+        gefs_mean = gefs_mean.rename({'time':'fhour'})
+        print('saving files')
+        hsa_final.to_netcdf(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}_{variable}_hsa.nc')
+        gefs_mean.to_netcdf(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}_{variable}_mean.nc')
