@@ -397,5 +397,5 @@ def hsa_vectorized(variable):
     subset = subset_sprd_v(percentiles, mc_std)
     hsa_final = hsa_transform(gefs_sprd, subset)
     gefs_mean = gefs_mean.rename({'time':'fhour'})
-    hsa_final.to_netcdf(f'{ps.output_dir}{model_date.strftime('%Y%m%d_%H')}_{variable}_hsa.nc')
-    gefs_mean.to_netcdf(f'{ps.output_dir}{model_date.strftime('%Y%m%d_%H')}_{variable}_mean.nc')
+    hsa_final.to_netcdf(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}_{variable}_hsa.nc')
+    gefs_mean.to_netcdf(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}_{variable}_mean.nc')

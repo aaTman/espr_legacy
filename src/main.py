@@ -52,18 +52,20 @@ def multi_thread():
     [os.remove(os.path.join(ps.data_store,n)) for n in os.listdir(ps.data_store) if '.idx' in n]
     wx_vars = ['slp','wnd','tmp850','tmp925','pwat']
     now = datetime.now()
+    with open(ps.log_directory + 'current_run.txt', "r") as f:
+        model_date=datetime.datetime.strptime(f.readlines()[-1][5:16],'%Y%m%d_%H')
     with ProcessPoolExecutor(len(wx_vars)) as executor:
             executor.map(hsa.hsa_vectorized,wx_vars)
     with open(ps.log_directory + 'timing_log.txt', "a") as f:
         f.write(f'{datetime.now().strftime("%Y/%m/%d %H:%M:%S")} multiprocessing total is {np.round((datetime.now() - now).total_seconds(),2)}\n')
     [os.remove(os.path.join(ps.data_store,n)) for n in os.listdir(ps.data_store) if '.idx' in n]
-    
+    hsa_final = xr.load_dataset(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}_{variable}_hsa.nc')
+    gefs_mean = xr.load_dataset(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}_{variable}_mean.nc')
     for n in range(len(hsa_final.fhour)):
         plot.Map(hsa_final.isel(fhour=n), gefs_mean.isel(fhour=n), variable)   
     print(np.round((datetime.datetime.now() - now).total_seconds(),2))
+
 if __name__ == "__main__":
-
-
     vars = ['pwat']
     for v in vars:
         hsa.hsa(v)
