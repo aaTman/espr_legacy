@@ -6,3 +6,4 @@
 i
 /src/*.ipynb*
 *nohup.out
+/output
