@@ -5,14 +5,13 @@ import bottleneck
 import datetime
 import paths as ps
 import utils as ut
+import plot
 
 class MClimate(object):
     """
     Model climatology object.
-
     This class instantiates metadata for an MClimate xarray 
     object that can be produced with MClimate.generate()
-
     Parameters
     ---------
     date : string or datetime.date
@@ -383,20 +382,20 @@ def hsa_vectorized(variable):
     lats = np.arange(20,80.1,0.5)
     with open(ps.log_directory + 'current_run.txt', "r") as f:
         model_date=datetime.datetime.strptime(f.readlines()[-1][5:16],'%Y%m%d_%H')
-    print('opening new forecasts')
+    
     nfa_mean = NewForecastArray('mean',variable, None)
     gefs_mean = nfa_mean._load_all(subset_lat=lats,subset_lon=lons)
     nfa_sprd = NewForecastArray('sprd',variable, None)
     gefs_sprd = nfa_mean._load_all(subset_lat=lats,subset_lon=lons)
-    print('opening reforecasts')
+
     mc = MClimate(model_date, variable, None)
     mc_mu = xarr_interpolate(mc.generate(stat='mean',dask=True),gefs_mean)
     mc = MClimate(model_date, variable, None)
     mc_std = xarr_interpolate(mc.generate(stat='sprd',dask=True),gefs_mean)
-    print('percentiles -> hsa')
+
     percentiles = percentile_v(mc_mu, gefs_mean)
     subset = subset_sprd_v(percentiles, mc_std)
     hsa_final = hsa_transform(gefs_sprd, subset)
     gefs_mean = gefs_mean.rename({'time':'fhour'})
-    hsa_final.to_netcdf(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}_{variable}_hsa.nc')
-    gefs_mean.to_netcdf(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}_{variable}_mean.nc')
+    hsa_final.to_netcdf(f'{ps.output_dir}{model_date.strftime('%Y%m%d_%H')}_{variable}_hsa.nc')
+    gefs_mean.to_netcdf(f'{ps.output_dir}{model_date.strftime('%Y%m%d_%H')}_{variable}_mean.nc')
