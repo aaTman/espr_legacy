@@ -1,4 +1,7 @@
 import numpy as np
+import os 
+from datetime import datetime, timedelta 
+import paths as ps 
 
 def replace_year(x, year):
     """ Year must be a leap year for this to work """
@@ -18,3 +21,8 @@ def replace_year(x, year):
     # Finally, apply the day offset 
     x_year = x_year - day_offset
     return x_year
+
+def cleaner():
+    for file_name in os.listdir(ps.output_dir):
+        if (datetime.now() - datetime.strptime(file_name[0:11],'%Y%m%d_%H')).total_seconds() > 604800:
+            os.remove(f'{ps.output_dir}{file_name}')

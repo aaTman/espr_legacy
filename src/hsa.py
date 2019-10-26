@@ -3,6 +3,7 @@ import xarray as xr
 import xarray.ufuncs as xu
 import bottleneck
 import datetime
+import os
 import paths as ps
 import utils as ut
 import plot
@@ -387,7 +388,6 @@ def hsa_vectorized(variable):
     lats = np.arange(20,80.1,0.5)
     with open(ps.log_directory + 'current_run.txt', "r") as f:
         model_date=datetime.datetime.strptime(f.readlines()[-1][5:16],'%Y%m%d_%H')
-    
     if np.logical_and(os.path.isfile(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}_{variable}_hsa.nc'),
     os.path.isfile(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}_{variable}_mean.nc')):
         print('files previously saved')

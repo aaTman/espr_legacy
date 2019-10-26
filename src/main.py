@@ -58,9 +58,8 @@ def multi_thread():
         model_date=datetime.strptime(f.readlines()[-1][5:16],'%Y%m%d_%H')
     with ProcessPoolExecutor(len(wx_vars)) as executor:
         executor.map(hsa.hsa_vectorized,wx_vars)
-    with open(ps.log_directory + 'timing_log.txt', "a") as f:
-        f.write(f'{datetime.now().strftime("%Y/%m/%d %H:%M:%S")} multiprocessing total is {np.round((datetime.now() - now).total_seconds(),2)}\n')
     [os.remove(os.path.join(ps.data_store,n)) for n in os.listdir(ps.data_store) if '.idx' in n]
+    print('starting plots')
     for variable in wx_vars:
         hsa_final = xr.load_dataset(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}_{variable}_hsa.nc')
         gefs_mean = xr.load_dataset(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}_{variable}_mean.nc')

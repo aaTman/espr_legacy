@@ -6,6 +6,8 @@ import paths as ps
 import numpy as np
 import xarray as xr 
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import os
+from datetime import datetime
 
 class Map:
     def __init__(self, hsa, input_map, variable):
@@ -17,7 +19,13 @@ class Map:
         self.levels = np.linspace(-3,3,13)
         self.variable_range = self._set_variable_range()
         self._generate_map()
-        
+        self.model_date = self._model_date()
+
+    def _model_date(self):
+        with open(ps.log_directory + 'current_run.txt', "r") as f:
+            model_date=datetime.strptime(f.readlines()[-1][5:16],'%Y%m%d_%H')
+        return model_date
+
     def _convert_to_da(self, array):
         if type(array) == xr.Dataset:
             array = array[[n for n in array][0]]
@@ -112,10 +120,8 @@ class Map:
         fontproperties=self.font_bold,
         fontsize=14,
         loc='right')
-        try:
-            plt.savefig(f'{ps.plot_dir}{self.variable}_{step:.0f}.png',bbox_inches='tight',dpi=150)
-        except:
-            pass
+        os.mkdir(f'{ps.plot_dir}{self.model_date.strftime("%Y%m%d_%H")}')
+        plt.savefig(f'{ps.plot_dir}{self.model_date.strftime("%Y%m%d_%H")}/{self.variable}_{step:.0f}.png',bbox_inches='tight',dpi=150)
         plt.close('all')
 
 # def plot_variable(hsa, input_map):
