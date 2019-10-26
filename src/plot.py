@@ -60,7 +60,7 @@ class Map:
         ax.coastlines(resolution='50m')
         self.hsa = self.hsa.rename('Sigma')
         try:
-            c = self.hsa.where(np.abs(self.hsa) > 0.5).plot.contourf(
+            c = self.hsa.where(np.abs(self.hsa) > 0.5).plot.pcolormesh(
                 ax=ax,
                 transform=ccrs.PlateCarree(),
                 levels=self.levels,
@@ -121,10 +121,19 @@ class Map:
         fontproperties=self.font_bold,
         fontsize=14,
         loc='right')
-        os.mkdir(f'{ps.plot_dir}{self.model_date.strftime("%Y%m%d_%H")}')
-        plt.savefig(f'{ps.plot_dir}{self.model_date.strftime("%Y%m%d_%H")}/{self.variable}_{step:.0f}.png',bbox_inches='tight',dpi=150)
-        plt.close('all')
-
+        try:
+            os.mkdir(f'{ps.plot_dir}{self.model_date.strftime("%Y%m%d_%H")}')
+        except FileExistsError:
+            pass
+        try:
+            plt.savefig(f'{ps.plot_dir}{self.model_date.strftime("%Y%m%d_%H")}/{self.variable}_{step:.0f}.png',bbox_inches='tight',dpi=150) 
+        except ValueError:
+            self.input_map = self.input_map.fillna(0)
+            self.hsa = self.hsa.fillna(0)
+            print(self.input_map.max(), self.input_map.min())
+            print(self.hsa.max(), self.hsa.min())
+            plt.savefig(f'{ps.plot_dir}{self.model_date.strftime("%Y%m%d_%H")}/{self.variable}_{step:.0f}.png',bbox_inches='tight',dpi=150)        
+        plt.close('all')    
 # def plot_variable(hsa, input_map):
 
 #     hsa.where(np.abs(hsa) > 0.5).plot.contourf(
