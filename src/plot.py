@@ -12,6 +12,7 @@ from datetime import datetime
 class Map:
     def __init__(self, hsa, input_map, variable):
         self.variable = variable
+        self.model_date = self._model_date()
         self.hsa = self._convert_to_da(hsa)
         self.input_map = self._convert_to_da(input_map)
         self.font = fm.FontProperties(fname=ps.fpath)
@@ -19,7 +20,7 @@ class Map:
         self.levels = np.linspace(-3,3,13)
         self.variable_range = self._set_variable_range()
         self._generate_map()
-        self.model_date = self._model_date()
+        
 
     def _model_date(self):
         with open(ps.log_directory + 'current_run.txt', "r") as f:
