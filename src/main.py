@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import hsa
 from tqdm import tqdm
 import warnings
@@ -9,6 +11,7 @@ from concurrent.futures import ProcessPoolExecutor
 import numpy as np
 import xarray as xr
 import plot
+import utils
 
 # Define a context manager to suppress stdout and stderr.
 class suppress_stdout_stderr(object):
@@ -59,12 +62,8 @@ def multi_thread():
     with ProcessPoolExecutor(len(wx_vars)) as executor:
         executor.map(hsa.hsa_vectorized,wx_vars)
     [os.remove(os.path.join(ps.data_store,n)) for n in os.listdir(ps.data_store) if '.idx' in n]
-    print('starting plots')
-    for variable in wx_vars:
-        hsa_final = xr.load_dataset(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}_{variable}_hsa.nc')
-        gefs_mean = xr.load_dataset(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}_{variable}_mean.nc')
-        for n in range(len(hsa_final.fhour)):
-            plot.Map(hsa_final.isel(fhour=n), gefs_mean.isel(fhour=n), variable)   
+    print('uploading to itpa')
+    utils.scp_call(ps.plot_dir, f'{ps.itpa_login}:{ps.plot_itpa_dir}')
     print(np.round((datetime.now() - now).total_seconds(),2))
 
 if __name__ == "__main__":

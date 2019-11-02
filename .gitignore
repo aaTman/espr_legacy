@@ -5,5 +5,6 @@
 *.pyc
 i
 /src/*.ipynb*
+/src/paths.py
 *nohup.out
 /output

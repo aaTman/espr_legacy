@@ -7,6 +7,7 @@ import os
 import paths as ps
 import utils as ut
 import plot
+import subprocess
 
 class MClimate(object):
     """
@@ -250,6 +251,8 @@ class NewForecastArray(object):
         subset_gefs = self._map(subset_gefs)
         return subset_gefs
 
+
+
 def xarr_interpolate(original, new, on='latlon'):
     if on == 'latlon':
         new_lat = [i for i in new.coords if 'lat' in i][0]
@@ -262,8 +265,6 @@ def xarr_interpolate(original, new, on='latlon'):
         raise Exception('latlon interpolation only works as of now...')
 
 def percentile(mclimate, forecast):
-
-    ## try to solve the mystery of the unconcatable dimensions with identical dimensions.....
     try:
         forecast = forecast.expand_dims(dim='time')
     except ValueError:
@@ -292,7 +293,6 @@ def percentile(mclimate, forecast):
     return percentile
 
 def percentile_v(mclimate, forecast):
-    ## try to solve the mystery of the unconcatable dimensions with identical dimensions.....
     try:
         forecast = forecast.expand_dims(dim='time')
     except ValueError:
@@ -300,7 +300,6 @@ def percentile_v(mclimate, forecast):
         forecast = forecast.assign_coords(fhour=mclimate.fhour)
         forecast = forecast.expand_dims(time=[mclimate.time.values[-1]])
     vars = ['step','meanSea','valid_time','isobaricInhPa', 'pressure', 'heightAboveGround']
-    
     for var in vars:
         try:
             forecast = forecast.drop([var])
@@ -386,7 +385,7 @@ def hsa_vectorized(variable):
     now = datetime.datetime.now()
     lons = np.arange(180,310.1,0.5)
     lats = np.arange(20,80.1,0.5)
-    with open(ps.log_directory + 'current_run.txt', "r") as f:
+    with open(ps.log_directory + 'new_run.txt', "r") as f:
         model_date=datetime.datetime.strptime(f.readlines()[-1][5:16],'%Y%m%d_%H')
     if np.logical_and(os.path.isfile(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}_{variable}_hsa.nc'),
     os.path.isfile(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}_{variable}_mean.nc')):
@@ -396,7 +395,7 @@ def hsa_vectorized(variable):
         nfa_mean = NewForecastArray('mean',variable, None)
         gefs_mean = nfa_mean._load_all(subset_lat=lats,subset_lon=lons)
         nfa_sprd = NewForecastArray('sprd',variable, None)
-        gefs_sprd = nfa_mean._load_all(subset_lat=lats,subset_lon=lons)
+        gefs_sprd = nfa_sprd._load_all(subset_lat=lats,subset_lon=lons)
         print('loading reforecasts')
         mc = MClimate(model_date, variable, None)
         mc_mu = xarr_interpolate(mc.generate(stat='mean',dask=True),gefs_mean)
@@ -408,5 +407,13 @@ def hsa_vectorized(variable):
         hsa_final = hsa_transform(gefs_sprd, subset)
         gefs_mean = gefs_mean.rename({'time':'fhour'})
         print('saving files')
-        hsa_final.to_netcdf(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}_{variable}_hsa.nc')
-        gefs_mean.to_netcdf(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}_{variable}_mean.nc')
+        try:
+            os.mkdir(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}')
+        except FileExistsError:
+            print('path already created')
+        hsa_final.to_netcdf(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}/{variable}_hsa.nc')
+        gefs_mean.to_netcdf(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}/{variable}_mean.nc')
+    print('starting plots')
+    for n in range(len(hsa_final.fhour)):
+        plot.Map(hsa_final.isel(fhour=n), gefs_mean.isel(fhour=n), variable, model_date)   
+    print('finished plots')

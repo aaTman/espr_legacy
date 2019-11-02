@@ -10,9 +10,9 @@ import os
 from datetime import datetime
 
 class Map:
-    def __init__(self, hsa, input_map, variable):
+    def __init__(self, hsa, input_map, variable, model_date):
         self.variable = variable
-        self.model_date = self._model_date()
+        self.model_date = model_date
         self.hsa = self._convert_to_da(hsa)
         self.input_map = self._convert_to_da(input_map)
         self.font = fm.FontProperties(fname=ps.fpath)
@@ -20,12 +20,6 @@ class Map:
         self.levels = np.linspace(-3,3,13)
         self.variable_range = self._set_variable_range()
         self._generate_map()
-        
-
-    def _model_date(self):
-        with open(ps.log_directory + 'current_run.txt', "r") as f:
-            model_date=datetime.strptime(f.readlines()[-1][5:16],'%Y%m%d_%H')
-        return model_date
 
     def _convert_to_da(self, array):
         if type(array) == xr.Dataset:
@@ -42,6 +36,7 @@ class Map:
         elif self.variable == 'wnd':
             return np.arange(0,150,2)
         elif 'tmp' in self.variable:
+            self.input_map = self.input_map - 273.15
             return np.arange(-50,50,4)
 
     def _generate_map(self):
@@ -134,39 +129,4 @@ class Map:
             print(self.hsa.max(), self.hsa.min())
             plt.savefig(f'{ps.plot_dir}{self.model_date.strftime("%Y%m%d_%H")}/{self.variable}_{step:.0f}.png',bbox_inches='tight',dpi=150)        
         plt.close('all')    
-# def plot_variable(hsa, input_map):
 
-#     hsa.where(np.abs(hsa) > 0.5).plot.contourf(
-#         ax=ax,
-#         transform=ccrs.PlateCarree(),
-#         levels=input_map.levels,
-#         add_colorbar=False,
-#         alpha=0.9
-#     )
-    
-#     # if 'var_map' in args:
-#     #     var_map = var_map
-#     #     var_map.plot.contour(
-#     #     ax=ax,
-#     #     transform=ccrs.PlateCarree(),
-#     #     levels=input_map.levels,
-#     #     add_colorbar=False,
-#     #     colors='k',
-#     #     alpha=0.9
-#     # )
-
-#     date = hsa.valid_time.dt.strftime("%Y/%m/%d %Hz").values
-#     step = hsa.step.values.astype("timedelta64[h]")/np.timedelta64(1, "h")
-#     ax.set_title(f'HISTORICAL SPREAD ANOMALY',
-#     fontproperties=input_map.font,
-#     fontsize=16,
-#     loc='left')
-#     ax.set_title(f'FHOUR: {step:2.0f}',
-#     fontproperties=input_map.font_bold,
-#     fontsize=14,
-#     loc='center')
-#     ax.set_title(f'VALID: {date}',
-#     fontproperties=input_map.font_bold,
-#     fontsize=14,
-#     loc='right')
-#     plt.savefig('test.png',bbox_inches='tight',dpi=300)

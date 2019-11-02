@@ -2,6 +2,7 @@ import numpy as np
 import os 
 from datetime import datetime, timedelta 
 import paths as ps 
+import subprocess
 
 def replace_year(x, year):
     """ Year must be a leap year for this to work """
@@ -26,3 +27,9 @@ def cleaner():
     for file_name in os.listdir(ps.output_dir):
         if (datetime.now() - datetime.strptime(file_name[0:11],'%Y%m%d_%H')).total_seconds() > 604800:
             os.remove(f'{ps.output_dir}{file_name}')
+    for file_name in os.listdir(ps.plot_dir):
+        if (datetime.now() - datetime.strptime(file_name[0:11],'%Y%m%d_%H')).total_seconds() > 604800:
+            os.remove(f'{ps.plot_dir}{file_name}')
+
+def scp_call(source, dest):
+    subprocess.call(['scp','-r',source,dest],stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
