@@ -33,3 +33,8 @@ def cleaner():
 
 def scp_call(source, dest):
     subprocess.call(['scp','-r',source,dest],stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+def rsync_call(source, dest):
+    subprocess.call(['rsync','-avh','--delete-after',source,dest],stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        

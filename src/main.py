@@ -64,7 +64,9 @@ def multi_thread():
     [os.remove(os.path.join(ps.data_store,n)) for n in os.listdir(ps.data_store) if '.idx' in n]
     print('uploading to itpa')
     utils.scp_call(ps.plot_dir, f'{ps.itpa_login}:{ps.plot_itpa_dir}')
+    utils.scp_call(f'{ps.log_directory}current_run.txt',f'{ps.itpa_login}:{ps.model_run_itpa_dir}')
     print(np.round((datetime.now() - now).total_seconds(),2))
+    utils.cleaner(ps.plot_dir)
 
 if __name__ == "__main__":
     vars = ['pwat']
