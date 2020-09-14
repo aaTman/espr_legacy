@@ -129,10 +129,10 @@ class MClimate(object):
         return file
 
     def generate(self,stat='mean',dask=False):
-        try:
-            xarr = self._retrieve_from_xr(stat, dask=dask)
-        except:
-            raise Exception('type must be mean or sprd')
+        # try:
+        xarr = self._retrieve_from_xr(stat, dask=dask)
+        # except:
+        #     raise Exception('type must be mean or sprd')
         return xarr
 
 
@@ -234,12 +234,17 @@ class NewForecastArray(object):
         return subset_gefs
 
     def _load_all(self, subset_lat=None, subset_lon=None):
-        new_gefs = xr.open_mfdataset(f'{ps.data_store}*{self.stat}*.grib2',
-        engine='cfgrib',
-        combine='nested',
-        concat_dim='time',
-        backend_kwargs=dict(filter_by_keys=self.key_filter,indexpath='')
-        )
+        try:
+            new_gefs = xr.open_mfdataset(f'{ps.data_store}*{self.stat}*.grib2',
+            engine='cfgrib',
+            combine='nested',
+            concat_dim='time',
+            backend_kwargs=dict(filter_by_keys=self.key_filter,indexpath='')
+            )
+        except KeyError:
+            import cfgrib
+            new_gefs = cfgrib.open_datasets(f'{ps.data_store}gefs_mean_000.grib2')
+            import pdb; pdb.set_trace()
         subset_gefs = self._get_var(new_gefs)
         subset_gefs = self._rename_latlon(new_gefs)
         try:
@@ -378,10 +383,12 @@ def hsa(variable, hourf=168):
         percentiles = percentile(mc_mu, gefs_mean)
         subset = subset_sprd(percentiles, mc_std)
         hsa_final = hsa_transform(gefs_sprd, subset)
-        plot.NorthAmerica(hsa_final, gefs_mean, variable) 
+        plot.Map(hsa_final, gefs_mean, variable) 
     return hsa_final
 
-def hsa_vectorized(variable):
+def hsa_vectorized(args):
+    variable=args[0]
+    flush=args[1]
     now = datetime.datetime.now()
     lons = np.arange(180,310.1,0.5)
     lats = np.arange(20,80.1,0.5)
@@ -391,29 +398,39 @@ def hsa_vectorized(variable):
     os.path.isfile(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}_{variable}_mean.nc')):
         print('files previously saved')
     else:
-        print('loading gefs forecasts')
+        print(f'loading gefs {variable} forecasts')
         nfa_mean = NewForecastArray('mean',variable, None)
         gefs_mean = nfa_mean._load_all(subset_lat=lats,subset_lon=lons)
         nfa_sprd = NewForecastArray('sprd',variable, None)
         gefs_sprd = nfa_sprd._load_all(subset_lat=lats,subset_lon=lons)
-        print('loading reforecasts')
+        print(f'loaded; loading {variable} reforecasts')
         mc = MClimate(model_date, variable, None)
         mc_mu = xarr_interpolate(mc.generate(stat='mean',dask=True),gefs_mean)
         mc = MClimate(model_date, variable, None)
         mc_std = xarr_interpolate(mc.generate(stat='sprd',dask=True),gefs_mean)
-        print('stats time')
+        print(f'{variable} stats time')
         percentiles = percentile_v(mc_mu, gefs_mean)
         subset = subset_sprd_v(percentiles, mc_std)
         hsa_final = hsa_transform(gefs_sprd, subset)
         gefs_mean = gefs_mean.rename({'time':'fhour'})
-        print('saving files')
+        print(f'saving {variable} files')
         try:
             os.mkdir(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}')
         except FileExistsError:
             print('path already created')
-        hsa_final.to_netcdf(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}/{variable}_hsa.nc')
-        gefs_mean.to_netcdf(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}/{variable}_mean.nc')
-    print('starting plots')
-    for n in range(len(hsa_final.fhour)):
-        plot.Map(hsa_final.isel(fhour=n), gefs_mean.isel(fhour=n), variable, model_date)   
-    print('finished plots')
+        if flush:
+            os.mkdir(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}_flush')
+            percentiles.to_netcdf(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}_flush/{variable}_percentiles.nc',mode='w')
+            subset.to_netcdf(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}_flush/{variable}_subset.nc',mode='w')
+            hsa_final.to_netcdf(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}_flush/{variable}_hsa.nc',mode='w')
+            gefs_mean.to_netcdf(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}_flush/{variable}_mean.nc',mode='w')
+        else:
+            hsa_final.to_netcdf(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}/{variable}_hsa.nc',mode='w')
+            gefs_mean.to_netcdf(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}/{variable}_mean.nc',mode='w')
+    if flush:
+        pass
+    else:
+        print('starting plots')
+        for n in range(len(hsa_final.fhour)):
+            plot.Map(hsa_final.isel(fhour=n), gefs_mean.isel(fhour=n), variable, model_date,dpi=72)   
+        print('finished plots')

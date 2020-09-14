@@ -10,8 +10,9 @@ import os
 from datetime import datetime
 
 class Map:
-    def __init__(self, hsa, input_map, variable, model_date):
+    def __init__(self, hsa, input_map, variable, model_date, dpi=72):
         self.variable = variable
+        self.dpi = dpi
         self.model_date = model_date
         self.hsa = self._convert_to_da(hsa)
         self.input_map = self._convert_to_da(input_map)
@@ -127,6 +128,6 @@ class Map:
             self.hsa = self.hsa.fillna(0)
             print(self.input_map.max(), self.input_map.min())
             print(self.hsa.max(), self.hsa.min())
-            plt.savefig(f'{ps.plot_dir}{self.model_date.strftime("%Y%m%d_%H")}/{self.variable}_{step:.0f}.png',bbox_inches='tight',dpi=150)        
+            plt.savefig(f'{ps.plot_dir}{self.model_date.strftime("%Y%m%d_%H")}/{self.variable}_{step:.0f}.png',bbox_inches='tight',dpi=self.dpi)        
         plt.close('all')    
 

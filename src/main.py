@@ -53,20 +53,24 @@ def run_hsa():
     with open(ps.log_directory + 'timing_log.txt', "a") as f:
         f.write(f'single process total is {np.round((datetime.now() - now).total_seconds(),2)}\n')
 
-def multi_thread():
+def multi_thread(flush=False):
     [os.remove(os.path.join(ps.data_store,n)) for n in os.listdir(ps.data_store) if '.idx' in n]
     wx_vars = ['slp','wnd','tmp850','tmp925','pwat']
+    vars_flush = ((n, flush) for n in wx_vars)
     now = datetime.now()
     with open(ps.log_directory + 'current_run.txt', "r") as f:
         model_date=datetime.strptime(f.readlines()[-1][5:16],'%Y%m%d_%H')
     with ProcessPoolExecutor(len(wx_vars)) as executor:
-        executor.map(hsa.hsa_vectorized,wx_vars)
-    [os.remove(os.path.join(ps.data_store,n)) for n in os.listdir(ps.data_store) if '.idx' in n]
-    print('uploading to itpa')
-    utils.scp_call(ps.plot_dir, f'{ps.itpa_login}:{ps.plot_itpa_dir}')
-    utils.scp_call(f'{ps.log_directory}current_run.txt',f'{ps.itpa_login}:{ps.model_run_itpa_dir}')
-    print(np.round((datetime.now() - now).total_seconds(),2))
-    utils.cleaner(ps.plot_dir)
+        executor.map(hsa.hsa_vectorized,vars_flush)
+    if flush:
+        print(f'vectorized total time (seconds): {np.round((datetime.now() - now).total_seconds(),2)}')
+    else:
+        [os.remove(os.path.join(ps.data_store,n)) for n in os.listdir(ps.data_store) if '.idx' in n]
+        print('uploading to itpa')
+        utils.scp_call(f'{ps.log_directory}current_run.txt',f'{ps.itpa_login}:{ps.model_run_itpa_dir}')
+        utils.rsync_call(ps.plot_dir, f'{ps.itpa_login}:{ps.plot_itpa_dir}')
+        print(f'vectorized total time (seconds): {np.round((datetime.now() - now).total_seconds(),2)}')
+        utils.cleaner()
 
 if __name__ == "__main__":
     vars = ['pwat']
