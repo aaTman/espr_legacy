@@ -24,22 +24,22 @@ def monitor(server, directory, temp_store, flush=False):
     new_date = ftp.nlst("-t")[0]
     ftp.cwd(new_date)
     new_run = ftp.nlst("-t")[0]
-    print(new_run)
-    print(old_run)
-    if new_run != old_run:
+    if new_date+new_run != old_date+old_run:
+        print('new run available in ftp directory')
         if flush:
+            print('flushing')
             new_flush_run = old_run
             new_flush_date = old_date
-            ftp.cwd(f'{new_flush_run}/pgrb2ap5')
+            ftp.cwd(f'{new_flush_run}/atmos/pgrb2ap5')
             with open(f'{log_directory}new_run.txt', "w") as f:
                 f.write(new_flush_date+'_'+new_flush_run+'_\n')
             retr_files(ftp,temp_store)
             ftp.quit()
             print('flush old run starting')
             main.multi_thread(flush=flush)     
-        else:  
+        else:
             try:
-                ftp.cwd(f'{new_run}/pgrb2ap5')
+                ftp.cwd(f'{new_run}/atmos/pgrb2ap5')
                 if any('.f174' in s for s in ftp.nlst()):
                     with open(f'{log_directory}new_run.txt', "w") as f:
                         f.write(new_date+'_'+new_run+'_\n')
