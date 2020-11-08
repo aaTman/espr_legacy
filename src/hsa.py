@@ -422,7 +422,7 @@ def hsa_vectorized(args):
         print(f'hsa total time (seconds): {np.round((datetime.datetime.now() - now).total_seconds(),2)}')
         now = datetime.datetime.now()
         gefs_mean = gefs_mean.rename({'time':'fhour'})
-        print(f'saving {variable} files')
+        print(f'saving {variable} files...')
         try:
             os.mkdir(f'{ps.output_dir}{model_date.strftime("%Y%m%d_%H")}')
         except FileExistsError:
