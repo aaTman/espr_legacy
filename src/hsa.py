@@ -257,7 +257,6 @@ class NewForecastArray(object):
         return subset_gefs
 
 
-
 def xarr_interpolate(original, new, on='latlon'):
     if on == 'latlon':
         new_lat = [i for i in new.coords if 'lat' in i][0]
@@ -403,15 +402,25 @@ def hsa_vectorized(args):
         gefs_mean = nfa_mean._load_all(subset_lat=lats,subset_lon=lons)
         nfa_sprd = NewForecastArray('sprd',variable, None)
         gefs_sprd = nfa_sprd._load_all(subset_lat=lats,subset_lon=lons)
+        print(f'loading mean/spread total time (seconds): {np.round((datetime.datetime.now() - now).total_seconds(),2)}')
+        now = datetime.datetime.now()
         print(f'loaded; loading {variable} reforecasts')
         mc = MClimate(model_date, variable, None)
         mc_mu = xarr_interpolate(mc.generate(stat='mean',dask=True),gefs_mean)
         mc = MClimate(model_date, variable, None)
         mc_std = xarr_interpolate(mc.generate(stat='sprd',dask=True),gefs_mean)
+        print(f'mclimate + interpolate total time (seconds): {np.round((datetime.datetime.now() - now).total_seconds(),2)}')
+        now = datetime.datetime.now()
         print(f'{variable} stats time')
         percentiles = percentile_v(mc_mu, gefs_mean)
+        print(f'percentile total time (seconds): {np.round((datetime.datetime.now() - now).total_seconds(),2)}')
+        now = datetime.datetime.now()
         subset = subset_sprd_v(percentiles, mc_std)
+        print(f'subset total time (seconds): {np.round((datetime.datetime.now() - now).total_seconds(),2)}')
+        now = datetime.datetime.now()
         hsa_final = hsa_transform(gefs_sprd, subset)
+        print(f'hsa total time (seconds): {np.round((datetime.datetime.now() - now).total_seconds(),2)}')
+        now = datetime.datetime.now()
         gefs_mean = gefs_mean.rename({'time':'fhour'})
         print(f'saving {variable} files')
         try:
