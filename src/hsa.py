@@ -10,7 +10,7 @@ import plot
 import subprocess
 import logging
 
-logging.basicConfig(level=logging.DEBUG,filename='../logs/performance.log', filemode='w')
+logging.basicConfig(level=logging.INFO,filename='../logs/performance.log', filemode='w')
 
 class MClimate(object):
     """
@@ -417,24 +417,24 @@ def hsa_vectorized(args):
         gefs_mean = nfa_mean._load_all(subset_lat=lats,subset_lon=lons)
         nfa_sprd = NewForecastArray('sprd',variable, None)
         gefs_sprd = nfa_sprd._load_all(subset_lat=lats,subset_lon=lons)
-        logging.debug(f'loading mean/spread total time (seconds): {np.round((datetime.datetime.now() - now).total_seconds(),2)}')
+        logging.info(f'loading mean/spread total time (seconds): {np.round((datetime.datetime.now() - now).total_seconds(),2)}')
         now = datetime.datetime.now()
         print(f'loaded; loading {variable} reforecasts')
         mc = MClimate(model_date, variable, None)
         mc_mu = xarr_interpolate(mc.generate(stat='mean',dask=True),gefs_mean)
         mc = MClimate(model_date, variable, None)
         mc_std = xarr_interpolate(mc.generate(stat='sprd',dask=True),gefs_mean)
-        logging.debug(f'mclimate + interpolate total time (seconds): {np.round((datetime.datetime.now() - now).total_seconds(),2)}')
+        logging.info(f'mclimate + interpolate total time (seconds): {np.round((datetime.datetime.now() - now).total_seconds(),2)}')
         now = datetime.datetime.now()
         print(f'{variable} stats time')
         percentiles = percentile_v(mc_mu, gefs_mean)
-        logging.debug(f'percentile total time (seconds): {np.round((datetime.datetime.now() - now).total_seconds(),2)}')
+        logging.info(f'percentile total time (seconds): {np.round((datetime.datetime.now() - now).total_seconds(),2)}')
         now = datetime.datetime.now()
         subset = subset_sprd_v(percentiles, mc_std)
-        logging.debug(f'subset total time (seconds): {np.round((datetime.datetime.now() - now).total_seconds(),2)}')
+        logging.info(f'subset total time (seconds): {np.round((datetime.datetime.now() - now).total_seconds(),2)}')
         now = datetime.datetime.now()
         hsa_final = hsa_transform(gefs_sprd, subset)
-        logging.debug(f'hsa total time (seconds): {np.round((datetime.datetime.now() - now).total_seconds(),2)}')
+        logging.info(f'hsa total time (seconds): {np.round((datetime.datetime.now() - now).total_seconds(),2)}')
         now = datetime.datetime.now()
         gefs_mean = gefs_mean.rename({'time':'fhour'})
         print(f'saving {variable} files...')

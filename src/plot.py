@@ -52,7 +52,7 @@ class Map:
         ax.add_feature(cf.BORDERS, edgecolor='gray')
         ax.add_feature(cf.RIVERS, edgecolor='gray')
         ax.add_feature(cf.OCEAN, facecolor='gray')
-        ax.set_extent([-180,-50,20,65])
+        ax.set_extent([-180,-50,20,65],crs=ccrs.PlateCarree())
         ax.coastlines(resolution='50m')
         self.hsa = self.hsa.rename('Sigma')
         try:
