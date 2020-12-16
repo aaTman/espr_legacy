@@ -9,6 +9,7 @@ import utils as ut
 import plot
 import subprocess
 import logging
+from datetime import datetime
 
 logging.basicConfig(level=logging.INFO,filename=f'{ps.log_directory}performance.log', filemode='w')
 
@@ -97,6 +98,8 @@ class MClimate(object):
                 file = xr.open_dataset(f'{ps.rfcst}/{self.variable}_{stat}_{self._date_string()}.nc')
                 file = file.sel(pressure=850)
                 file = file.drop(['pressure'])
+            elif self.variables == 'slp':
+                file = xr.open_mfdataset(f'{ps.rfcst_v12}/{self.variable}_{stat}_{self._date_string()}.nc')
             else:
                 file = xr.open_dataset(f'{ps.rfcst}/{self.variable}_{stat}_{self._date_string()}.nc')
         else:
@@ -111,7 +114,7 @@ class MClimate(object):
                 file = xr.open_dataset(f'{ps.rfcst}/{self.variable}_{stat}_{self._date_string()}.nc')
                 file = file.sel(pressure=850)
             else:
-                file = xr.open_dataset(f'{ps.rfcst}/{self.variable}_{stat}_{self._date_string()}.nc', chunks={'time': 10})
+                file = xr.open_mfdataset(f'{ps.rfcst_v12}/{self.variable}/mean_hours/nh_time_pres_msl_{stat}_{self._date_string()}.nc', chunks={'time': 10})
         if self.fhour:
             file = file.sel(fhour=np.timedelta64(self.fhour,'h'))
         file = file.assign_coords(time=ut.replace_year(file.time.values, 2012))
@@ -125,10 +128,12 @@ class MClimate(object):
             file = xu.sqrt(file[[n for n in file.data_vars][0]]**2+file[[n for n in file.data_vars][1]]**2)
         return file
 
-    def _subset_time(self, file):
+    def _subset_time(self, file, v12=False):
         d64 = np.datetime64(self.date,'D')
         date_range = ut.replace_year(np.arange(d64-10,d64+11), 2012)
         file = xr.concat([file.sel(time=n) for n in date_range], dim='time')
+        if v12:
+            
         return file
 
     def generate(self,stat='mean',dask=False):
