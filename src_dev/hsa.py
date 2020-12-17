@@ -51,6 +51,7 @@ class MClimate(object):
             self._convert_variable()
         self.fhour = fhour
         self.percentage = percentage
+        self.v12 = False
 
     def _var_list(self):
         return ['slp','pwat','tmp925','tmp850','wnd']
@@ -98,8 +99,8 @@ class MClimate(object):
                 file = xr.open_dataset(f'{ps.rfcst}/{self.variable}_{stat}_{self._date_string()}.nc')
                 file = file.sel(pressure=850)
                 file = file.drop(['pressure'])
-            elif self.variables == 'slp':
-                file = xr.open_mfdataset(f'{ps.rfcst_v12}/{self.variable}_{stat}_{self._date_string()}.nc')
+            elif self.variables == 'slp' & self._date_string() == 'djf':
+                pass
             else:
                 file = xr.open_dataset(f'{ps.rfcst}/{self.variable}_{stat}_{self._date_string()}.nc')
         else:
@@ -113,27 +114,43 @@ class MClimate(object):
                 self.variable = 'tmp'
                 file = xr.open_dataset(f'{ps.rfcst}/{self.variable}_{stat}_{self._date_string()}.nc')
                 file = file.sel(pressure=850)
-            else:
-                file = xr.open_mfdataset(f'{ps.rfcst_v12}/{self.variable}/mean_hours/nh_time_pres_msl_{stat}_{self._date_string()}.nc', chunks={'time': 10})
-        if self.fhour:
-            file = file.sel(fhour=np.timedelta64(self.fhour,'h'))
-        file = file.assign_coords(time=ut.replace_year(file.time.values, 2012))
-        file = file.assign_coords({'time':file.time.values.astype('datetime64[h]')})
-        file = self._subset_time(file)
-        if self.fhour:   
-            file = file.drop(['intTime', 'intValidTime', 'fhour'])
+            elif self.variables == 'slp' & self._date_string() == 'djf':
+                pass
+        if self.variables == 'slp' & self._date_string() == 'djf':
+            self.stat = stat
+            self.v12 = True
+            file = self._subset_time(_,v12=True)
+            if self.fhour:
+                file = file.sel(time=np.timedelta64(self.fhour,'h'))
         else:
-            file = file.drop(['intTime', 'intValidTime'])
-        if self.variable == 'wnd':
-            file = xu.sqrt(file[[n for n in file.data_vars][0]]**2+file[[n for n in file.data_vars][1]]**2)
+            if self.fhour:
+                file = file.sel(fhour=np.timedelta64(self.fhour,'h'))
+            file = file.assign_coords(time=ut.replace_year(file.time.values, 2012))
+            file = file.assign_coords({'time':file.time.values.astype('datetime64[h]')})
+            file = self._subset_time(file)
+            if self.fhour:   
+                file = file.drop(['intTime', 'intValidTime', 'fhour'])
+            else:
+                file = file.drop(['intTime', 'intValidTime'])
+            if self.variable == 'wnd':
+                file = xu.sqrt(file[[n for n in file.data_vars][0]]**2+file[[n for n in file.data_vars][1]]**2)
         return file
 
     def _subset_time(self, file, v12=False):
         d64 = np.datetime64(self.date,'D')
         date_range = ut.replace_year(np.arange(d64-10,d64+11), 2012)
-        file = xr.concat([file.sel(time=n) for n in date_range], dim='time')
         if v12:
-            
+            dt2 = ut.dt2cal(date_range)
+            date_tuple_list = [(dt2[n,1],dt2[n,2]) for n in range(len(dt2))]
+            file_list = [n for n in file_dt if (n.month, n.day) in date_tuple_list]    
+            files_ndjf = [n.strftime(f'../reforecast_v12/slp/{self.stat}_hours/nh_time_pres_msl_%Y%m%d%H_mean.nc') for n in file_list]
+            file = xr.open_mfdataset(files_ndjf,
+                              coords='minimal',
+                              data_vars='minimal',
+                              compat='override',
+                              combine='nested',concat_dim='date',chunks={'date':1,'time':1})
+        else:
+            file = xr.concat([file.sel(time=n) for n in date_range], dim='time')
         return file
 
     def generate(self,stat='mean',dask=False):
@@ -165,7 +182,6 @@ class NewForecastArray(object):
             self.variable = 'pwat'
             self.key_filter = {'typeOfLevel':'unknown', 'level': 0}
         elif self.variable in ['temp','tmp','tmp850','tmp925']:
-            
             self.short_name = 't'
             if '925' in self.variable:
                 self.key_filter = {'typeOfLevel':'isobaricInhPa','level': 925, 'shortName': 't'}
