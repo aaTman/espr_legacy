@@ -50,6 +50,7 @@ class MClimate(object):
             self._convert_variable()
         self.fhour = fhour
         self.percentage = percentage
+        self.v12 = False
 
     def _var_list(self):
         return ['slp','pwat','tmp925','tmp850','wnd']
@@ -97,6 +98,8 @@ class MClimate(object):
                 file = xr.open_dataset(f'{ps.rfcst}/{self.variable}_{stat}_{self._date_string()}.nc')
                 file = file.sel(pressure=850)
                 file = file.drop(['pressure'])
+            elif self.variable == 'slp' & self._date_string() == 'djf':
+                pass
             else:
                 file = xr.open_dataset(f'{ps.rfcst}/{self.variable}_{stat}_{self._date_string()}.nc')
         else:
@@ -110,25 +113,49 @@ class MClimate(object):
                 self.variable = 'tmp'
                 file = xr.open_dataset(f'{ps.rfcst}/{self.variable}_{stat}_{self._date_string()}.nc')
                 file = file.sel(pressure=850)
-            else:
-                file = xr.open_dataset(f'{ps.rfcst}/{self.variable}_{stat}_{self._date_string()}.nc', chunks={'time': 10})
-        if self.fhour:
-            file = file.sel(fhour=np.timedelta64(self.fhour,'h'))
-        file = file.assign_coords(time=ut.replace_year(file.time.values, 2012))
-        file = file.assign_coords({'time':file.time.values.astype('datetime64[h]')})
-        file = self._subset_time(file)
-        if self.fhour:   
-            file = file.drop(['intTime', 'intValidTime', 'fhour'])
+            elif self.variable == 'slp' and self._date_string() == 'djf':
+                pass
+        if self.variable == 'slp' and self._date_string() == 'djf':
+            self.stat = stat
+            self.v12 = True
+            file = self._subset_time(0,v12=True)
+            if self.fhour:
+                file = file.sel(time=np.timedelta64(self.fhour,'h'))
         else:
-            file = file.drop(['intTime', 'intValidTime'])
-        if self.variable == 'wnd':
-            file = xu.sqrt(file[[n for n in file.data_vars][0]]**2+file[[n for n in file.data_vars][1]]**2)
+            if self.fhour:
+                file = file.sel(fhour=np.timedelta64(self.fhour,'h'))
+            file = file.assign_coords(time=ut.replace_year(file.time.values, 2012))
+            file = file.assign_coords({'time':file.time.values.astype('datetime64[h]')})
+            file = self._subset_time(file)
+            if self.fhour:   
+                file = file.drop(['intTime', 'intValidTime', 'fhour'])
+            else:
+                file = file.drop(['intTime', 'intValidTime'])
+            if self.variable == 'wnd':
+                file = xu.sqrt(file[[n for n in file.data_vars][0]]**2+file[[n for n in file.data_vars][1]]**2)
         return file
 
-    def _subset_time(self, file):
+    def _subset_time(self, file, v12=False):
         d64 = np.datetime64(self.date,'D')
         date_range = ut.replace_year(np.arange(d64-10,d64+11), 2012)
-        file = xr.concat([file.sel(time=n) for n in date_range], dim='time')
+        if v12:
+            dt2 = ut.dt2cal(date_range)
+            files = os.listdir(f'{ps.rfcst_v12}slp/mean_hours')
+            file_dt = [datetime.datetime.strptime(n[-18:-8],'%Y%m%d%H') for n in files]
+            date_tuple_list = [(dt2[n,1],dt2[n,2]) for n in range(len(dt2))]
+            file_list = [n for n in file_dt if (n.month, n.day) in date_tuple_list]
+            if self.stat == 'sprd':
+                v12_stat = 'std'
+            else:
+                v12_stat = self.stat
+            files_ndjf = [n.strftime(f'../reforecast_v12/slp/{v12_stat}_hours/nh_time_pres_msl_%Y%m%d%H_{v12_stat}.nc') for n in file_list]
+            file = xr.open_mfdataset(files_ndjf,
+                              coords='minimal',
+                              data_vars='minimal',
+                              compat='override',
+                              combine='nested',concat_dim='date',chunks={'date':1,'time':1})
+        else:
+            file = xr.concat([file.sel(time=n) for n in date_range], dim='time')
         return file
 
     def generate(self,stat='mean',dask=False):
@@ -160,7 +187,6 @@ class NewForecastArray(object):
             self.variable = 'pwat'
             self.key_filter = {'typeOfLevel':'unknown', 'level': 0}
         elif self.variable in ['temp','tmp','tmp850','tmp925']:
-            
             self.short_name = 't'
             if '925' in self.variable:
                 self.key_filter = {'typeOfLevel':'isobaricInhPa','level': 925, 'shortName': 't'}
@@ -299,13 +325,21 @@ def percentile(mclimate, forecast):
     percentile = new_stacked.rank('time')/len(new_stacked['time'])
     return percentile
 
-def percentile_v(mclimate, forecast):
-    try:
-        forecast = forecast.expand_dims(dim='time')
-    except ValueError:
+def percentile_v(mclimate, forecast, v12=False):
+    
+    if v12:
         forecast = forecast.rename({'time':'fhour'})
-        forecast = forecast.assign_coords(fhour=mclimate.fhour)
-        forecast = forecast.expand_dims(time=[mclimate.time.values[-1]])
+        mclimate = mclimate.rename({'time':'fhour','date':'time','latitude':'lat','longitude':'lon'})
+        forecast = forecast.expand_dims(dim='time')
+        fhours = [n.astype('timedelta64[m]').astype('int')/60 for n in forecast['step'].values]
+        forecast['fhour'] = fhours
+    else:
+        try:
+            forecast = forecast.expand_dims(dim='time')
+        except ValueError:
+            forecast = forecast.rename({'time':'fhour'})
+            forecast = forecast.assign_coords(fhour=mclimate.fhour)
+            forecast = forecast.expand_dims(time=[mclimate.time.values[-1]])
     vars = ['step','meanSea','valid_time','isobaricInhPa', 'pressure', 'heightAboveGround']
     for var in vars:
         try:
@@ -324,8 +358,8 @@ def percentile_v(mclimate, forecast):
     except ValueError:
         forecast = forecast.drop(['level'])
         new_stacked = xr.concat([mclimate[[n for n in mclimate][0]], forecast[[n for n in forecast][0]]],'time')
-    new_stacked = new_stacked.compute()
-    percentile = bottleneck.rankdata(new_stacked,axis=0)/len(new_stacked['time'])
+    new_stacked = new_stacked[:,::2][:,1:] # making sure the fhours align to every 6 hrs...
+    percentile = xr.apply_ufunc(bottleneck.rankdata,new_stacked,kwargs={'axis':0},dask='parallelized')/len(new_stacked['time'])
     return percentile
 
 def subset_sprd(combined_fcst_mcli, mcli_sprd):
@@ -342,27 +376,35 @@ def subset_sprd(combined_fcst_mcli, mcli_sprd):
         mcli_sprd = mcli_sprd.where(~np.isnan(new_perc[:-1]),drop=True)
     return mcli_sprd
 
-def subset_sprd_v(percentile, mc_std):
-    mask = np.logical_and(percentile >= percentile[-1]-0.05, percentile <= percentile[-1]+0.05)
+def subset_sprd_v(percentile, mc_std, v12=False):
+    mask = np.logical_and(percentile >= percentile[-1]-0.05, percentile <= percentile[-1]+0.05)[:-1]
     try:
         mc_std = mc_std[[n for n in mc_std][0]]
     except:
         pass
-    mc_std.rename({'fhour':'time','time':'fhour'})
-    mask_da=xr.DataArray(mask[:-1], coords={
-        'fhour':mc_std.fhour.values, 
-        'time':mc_std.time.values, 
-        'lat':mc_std.lat.values, 
-        'lon':mc_std.lon.values 
-        }, 
-    dims={ 
-        'time': len(mc_std.time), 
-        'fhour':len(mc_std.fhour), 
-        'lat': len(mc_std.lat), 
-        'lon': len(mc_std.lon) 
-        }
-    )    
-    mc_std  = mc_std.where(~np.isnan(mask_da),drop=True)
+    if v12:
+        import pdb; pdb.set_trace()
+        mc_std = mc_std.rename({'time':'fhour','date':'time','latitude':'lat','longitude':'lon'})
+        mc_std_t = mc_std[:,1::2]
+        mask_da = xr.concat([mc_std_t[:,n][mask[:,n]] for n in range(len(mask['fhour']))])
+        
+        mc_std  = mc_std.where(~np.isnan(mask_da),drop=True)
+    else:
+        mc_std.rename({'fhour':'time','time':'fhour'})
+        mask_da=xr.DataArray(mask[:-1], coords={
+            'fhour':mc_std.fhour.values, 
+            'time':mc_std.time.values, 
+            'lat':mc_std.lat.values, 
+            'lon':mc_std.lon.values 
+            }, 
+        dims={ 
+            'time': len(mc_std.time), 
+            'fhour':len(mc_std.fhour), 
+            'lat': len(mc_std.lat), 
+            'lon': len(mc_std.lon) 
+            }
+        )    
+        mc_std  = mc_std.where(~np.isnan(mask_da),drop=True)
 
     return mc_std
 
@@ -400,7 +442,7 @@ def hsa(variable, hourf=168):
         plot.Map(hsa_final, gefs_mean, variable) 
     return hsa_final
 
-def hsa_vectorized(args):
+def hsa_vectorized(args,v12=False):
     variable=args[0]
     flush=args[1]
     now = datetime.datetime.now()
@@ -427,10 +469,10 @@ def hsa_vectorized(args):
         logging.info(f'mclimate + interpolate total time (seconds): {np.round((datetime.datetime.now() - now).total_seconds(),2)}')
         now = datetime.datetime.now()
         print(f'{variable} stats time')
-        percentiles = percentile_v(mc_mu, gefs_mean)
+        percentiles = percentile_v(mc_mu, gefs_mean, v12=v12)
         logging.info(f'percentile total time (seconds): {np.round((datetime.datetime.now() - now).total_seconds(),2)}')
         now = datetime.datetime.now()
-        subset = subset_sprd_v(percentiles, mc_std)
+        subset = subset_sprd_v(percentiles, mc_std, v12=v12)
         logging.info(f'subset total time (seconds): {np.round((datetime.datetime.now() - now).total_seconds(),2)}')
         now = datetime.datetime.now()
         hsa_final = hsa_transform(gefs_sprd, subset)
