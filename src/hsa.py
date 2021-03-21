@@ -10,7 +10,7 @@ import plot
 import subprocess
 import logging
 
-logging.basicConfig(level=logging.INFO,filename='../logs/performance.log', filemode='w')
+logging.basicConfig(level=logging.INFO,filename=f'{ps.log_directory}performance.log', filemode='w')
 
 class MClimate(object):
     """

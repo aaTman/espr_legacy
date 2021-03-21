@@ -27,8 +27,8 @@ def setup_logger(name, log_file, level=logging.INFO):
     return logger
 
 formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
-summary_logger = setup_logger('summary_logger', '../logs/summary.log')
-error_logger = setup_logger('error_logger', '../logs/errors.log', level=logging.ERROR)
+summary_logger = setup_logger('summary_logger', f'{ps.log_directory}summary.log')
+error_logger = setup_logger('error_logger', f'{ps.log_directory}errors.log', level=logging.ERROR)
 
 
 def run_hsa():

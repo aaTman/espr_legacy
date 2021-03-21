@@ -2,6 +2,7 @@ import cartopy.crs as ccrs
 import cartopy.feature as cf
 import matplotlib.pyplot as plt 
 import matplotlib.font_manager as fm
+import matplotlib.colors as mc
 import paths as ps 
 import numpy as np
 import xarray as xr 
@@ -55,13 +56,21 @@ class Map:
         ax.set_extent([-180,-50,20,65],crs=ccrs.PlateCarree())
         ax.coastlines(resolution='50m')
         self.hsa = self.hsa.rename('Sigma')
+        n=35
+        x = 0.5
+        cmap = plt.cm.RdBu_r
+        lower = cmap(np.linspace(0, x, n))
+        white = np.ones((80-2*n,4))
+        upper = cmap(np.linspace(1-x, 1, n))
+        colors = np.vstack((lower, white, upper))
+        tmap = mc.LinearSegmentedColormap.from_list('map_white', colors)
         try:
             c = self.hsa.where(np.abs(self.hsa) > 0.5).plot.pcolormesh(
                 ax=ax,
                 transform=ccrs.PlateCarree(),
                 levels=self.levels,
-                add_colorbar=True,
-                cbar_kwargs={'pad':0.001, 'aspect':30},
+                add_colorbar=False,
+                cmap=tmap,
                 alpha=0.9
             )
         except ValueError:
@@ -102,19 +111,24 @@ class Map:
                 levels=self.variable_range,
                 add_colorbar=False,
                 linewidths=0.5
-            )        
+            )
+        divider = make_axes_locatable(ax)
+        ax_cb = divider.new_horizontal(size="5%", pad=0.001, axes_class=plt.Axes, aspect=30)
+        fig.add_axes(ax_cb)
+        cb = plt.colorbar(c, cax=ax_cb)
+        cb.set_label(label='Sigma',fontsize=16)
         date = self.hsa.valid_time.dt.strftime("%Y/%m/%d %Hz").values
         step = self.hsa.step.values.astype("timedelta64[h]")/np.timedelta64(1, "h")
         ax.set_title(f'HISTORICAL SPREAD ANOMALY',
-        fontproperties=self.font,
+
         fontsize=16,
         loc='left')
         ax.set_title(f'FHOUR: {step:3.0f}',
-        fontproperties=self.font_bold,
+
         fontsize=14,
         loc='center')
         ax.set_title(f'VALID: {date}',
-        fontproperties=self.font_bold,
+
         fontsize=14,
         loc='right')
         try:
